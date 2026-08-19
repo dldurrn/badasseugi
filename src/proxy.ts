@@ -12,7 +12,9 @@ import {
  *  1. 로그인하지 않았으면 로그인 화면으로.
  *  2. 아직 누가 쓰는지(보호자/어느 자녀) 고르지 않았으면 프로필 선택 화면으로.
  *
- * 서버 컴포넌트는 쿠키를 쓸 수 없으므로 이 미들웨어가 그 역할을 합니다.
+ * 서버 컴포넌트는 쿠키를 쓸 수 없으므로 이 프록시가 그 역할을 합니다.
+ * (Next.js 16부터 `middleware.ts`가 `proxy.ts`로 이름이 바뀌었습니다.
+ *  하는 일은 같고, 파일 이름과 내보내는 함수 이름만 바뀌었습니다.)
  */
 
 const PUBLIC_PATHS = ['/login', '/auth', '/privacy'];
@@ -20,7 +22,7 @@ const PUBLIC_PATHS = ['/login', '/auth', '/privacy'];
 /** 프로필을 고르기 전에도 열려 있어야 하는 화면 (선택 화면 자체와 그 안의 흐름) */
 const PROFILE_PATHS = ['/children'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
