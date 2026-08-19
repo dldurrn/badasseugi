@@ -1,0 +1,340 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   디자인 시스템
+
+   소재: 원고지(국어 공책의 격자), 빨간펜 교정, 연필 흑연.
+   색은 각각 역할이 하나씩만 있습니다.
+     초록 = 구조와 정답      빨강 = 교정      금색 = 보상(그 순간에만)
+   금색이 화면에 흔하게 나오면 보상의 의미가 사라지므로,
+   시험을 끝까지 마친 결과 화면 외에는 쓰지 않습니다.
+   ========================================================================== */
+
+@layer base {
+  :root {
+    /* 종이 */
+    --paper: #fbfaf6;
+    --paper-sunk: #f4f1e7;
+    --card: #ffffff;
+    --rule: #e6e2d6;
+    --rule-strong: #d5cfbd;
+
+    /* 글자 (연필 흑연 계열) */
+    --ink: #232b33;
+    --ink-soft: #656f7b;
+    --ink-faint: #98a1ac;
+
+    /* 원고지 격자 — 구조와 정답 */
+    --grid: #2e7d5b;
+    --grid-deep: #1f5a41;
+    --grid-tint: #eaf3ee;
+
+    /* 빨간펜 — 교정 */
+    --pen: #d8402f;
+    --pen-tint: #fceceA;
+    --pen-deep: #a92e20;
+
+    /* 도장 금색 — 보상 전용 */
+    --gold: #c9902a;
+    --gold-tint: #faf1dc;
+
+    /* 유형 태그 */
+    --tag-batchim: #b3452f;
+    --tag-batchim-bg: #fbe9e4;
+    --tag-vowel: #2f6ba8;
+    --tag-vowel-bg: #e7f0f9;
+    --tag-consonant: #6b4ba8;
+    --tag-consonant-bg: #efeafa;
+    --tag-spacing: #1f6b5c;
+    --tag-spacing-bg: #e4f2ee;
+    --tag-punct: #8a6320;
+    --tag-punct-bg: #f8eeda;
+    --tag-letter: #5a6270;
+    --tag-letter-bg: #edeef1;
+
+    --radius: 14px;
+    --radius-sm: 10px;
+
+    /* 격자 한 칸 크기 — 화면 폭에 따라 조정 */
+    --cell: 46px;
+  }
+
+  @media (max-width: 480px) {
+    :root {
+      --cell: 38px;
+    }
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--paper);
+    /* 공책의 옅은 가로줄 — 거의 안 보일 정도로만 */
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0 35px,
+      rgba(46, 125, 91, 0.055) 35px 36px
+    );
+    color: var(--ink);
+    font-family: 'Pretendard Variable', Pretendard, -apple-system,
+      BlinkMacSystemFont, system-ui, 'Malgun Gothic', sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    word-break: keep-all; /* 한글 단어 중간에서 줄바꿈되지 않게 */
+  }
+
+  /* 표제는 명조 — 국어 교과서의 결 */
+  .display {
+    font-family: 'Gowun Batang', 'Nanum Myeongjo', serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* 키보드 사용자를 위한 또렷한 포커스 */
+  :focus-visible {
+    outline: 2.5px solid var(--grid);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--grid-tint);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* ---------- 기본 표면 ---------- */
+  .surface {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+  }
+
+  .surface-sunk {
+    background: var(--paper-sunk);
+    border-radius: var(--radius);
+  }
+
+  /* ---------- 버튼 ---------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    line-height: 1;
+    padding: 14px 20px;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+      transform 0.06s ease;
+    cursor: pointer;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: var(--grid);
+    color: #fff;
+    border: 1px solid var(--grid);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--grid-deep);
+  }
+
+  .btn-secondary {
+    background: var(--card);
+    color: var(--ink);
+    border: 1px solid var(--rule-strong);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--ink-faint);
+  }
+
+  .btn-quiet {
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1px solid transparent;
+    padding: 10px 14px;
+  }
+  .btn-quiet:hover:not(:disabled) {
+    background: var(--paper-sunk);
+  }
+
+  .btn-lg {
+    padding: 17px 24px;
+    font-size: 17px;
+    width: 100%;
+  }
+
+  /* ---------- 입력 ---------- */
+  .field {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-sm);
+    padding: 13px 15px;
+    font-size: 16px;
+    font-family: inherit;
+    color: var(--ink);
+  }
+  .field::placeholder {
+    color: var(--ink-faint);
+  }
+  .field:focus {
+    outline: 2.5px solid var(--grid);
+    outline-offset: 0;
+    border-color: transparent;
+  }
+
+  /* 받아쓰기 답 입력칸 — 원고지 위에 쓰는 느낌 */
+  .field-answer {
+    font-size: 22px;
+    padding: 18px 16px;
+    letter-spacing: 0.04em;
+    text-align: center;
+    background-image: linear-gradient(
+      to right,
+      transparent calc(var(--cell) - 1px),
+      rgba(46, 125, 91, 0.1) calc(var(--cell) - 1px) var(--cell)
+    );
+    background-size: var(--cell) 100%;
+  }
+
+  /* ---------- 원고지 격자 (signature) ---------- */
+  .grid-cell {
+    width: var(--cell);
+    height: var(--cell);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell) * 0.5);
+    border-radius: 6px;
+    border: 1.5px solid var(--rule);
+    background: var(--paper);
+    flex-shrink: 0;
+  }
+
+  /* 정답 줄 */
+  .grid-cell--answer {
+    background: var(--grid-tint);
+    border-color: rgba(46, 125, 91, 0.32);
+    color: var(--grid-deep);
+  }
+  /* 아이가 쓴 줄 */
+  .grid-cell--mine {
+    background: var(--card);
+    border-color: var(--rule-strong);
+    color: var(--ink);
+  }
+  /* 틀린 칸 */
+  .grid-cell--wrong {
+    background: var(--pen-tint);
+    border: 2px solid var(--pen);
+    color: var(--pen-deep);
+    font-weight: 600;
+  }
+  /* 정답 줄에서 주목시킬 칸 */
+  .grid-cell--focus {
+    border: 2px solid var(--grid);
+    background: #fff;
+    color: var(--grid-deep);
+    font-weight: 600;
+  }
+  /* 받침 오류는 동그라미로 구분 */
+  .grid-cell--batchim {
+    border-radius: 50%;
+  }
+  /* 비어 있는 자리 */
+  .grid-cell--void {
+    border-style: dashed;
+    border-color: var(--rule-strong);
+    background: transparent;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- 유형 태그 ---------- */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .tag--batchim { color: var(--tag-batchim); background: var(--tag-batchim-bg); }
+  .tag--vowel { color: var(--tag-vowel); background: var(--tag-vowel-bg); }
+  .tag--consonant { color: var(--tag-consonant); background: var(--tag-consonant-bg); }
+  .tag--spacing { color: var(--tag-spacing); background: var(--tag-spacing-bg); }
+  .tag--punct { color: var(--tag-punct); background: var(--tag-punct-bg); }
+  .tag--letter { color: var(--tag-letter); background: var(--tag-letter-bg); }
+
+  /* ---------- 별 (오답노트 졸업 표시) ---------- */
+  .star-filled { color: var(--gold); }
+  .star-empty { color: var(--rule-strong); }
+
+  /* ---------- 보상 도장 ---------- */
+  @keyframes stamp-press {
+    0% { transform: scale(1.5) rotate(-8deg); opacity: 0; }
+    55% { transform: scale(0.94) rotate(-2deg); opacity: 1; }
+    100% { transform: scale(1) rotate(-2deg); opacity: 1; }
+  }
+  .stamp-in {
+    animation: stamp-press 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+  .rise-in {
+    animation: rise-in 0.28s ease-out both;
+  }
+
+  /* ---------- 기다리는 중 ----------
+     화면을 옮길 때 서버를 한 번 다녀오는데, 그동안 아무 변화가 없으면
+     아이는 버튼이 안 눌렸다고 생각해 다시 누릅니다.
+     원고지 칸이 차례로 옅어졌다 진해지는 정도로만 알립니다. */
+  @keyframes cell-breathe {
+    0%, 100% { opacity: 0.25; }
+    50% { opacity: 1; }
+  }
+  .cell-breathe {
+    animation: cell-breathe 1.1s ease-in-out infinite;
+  }
+
+  /* ---------- 화면 여백 ---------- */
+  .page {
+    width: 100%;
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 20px 18px 112px; /* 하단 탭바 공간 */
+  }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--ink-soft);
+    text-transform: none;
+  }
+}
