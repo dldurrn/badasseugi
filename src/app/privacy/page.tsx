@@ -7,13 +7,15 @@ export const metadata = { title: '개인정보처리방침 · 받아쓰기 공�
  * 이 앱은 아이 실명을 받지 않고 보호자 계정으로만 가입받는 구조로
  * 수집 자체를 최소화했습니다.
  *
- * 아래 대괄호 [ ]로 표시된 곳은 배포 전에 반드시 실제 값으로 바꿔야 합니다.
- * 값을 채우지 않은 채로 배포하면 고지 의무를 지키지 못한 것이 됩니다.
+ * 아래 세 값은 고지 의무가 걸린 항목입니다.
+ * 운영자나 연락처가 바뀌면 여기만 고치면 화면 전체에 반영됩니다.
+ * 방침 내용을 고칠 때는 시행일도 함께 올려 주세요 —
+ * 언제부터 적용되는 방침인지가 고지의 핵심입니다.
  */
 
-const OPERATOR = '[운영자 이름 또는 상호]';
-const CONTACT = '[문의 이메일]';
-const EFFECTIVE_DATE = '[시행일: YYYY년 M월 D일]';
+const OPERATOR = '이영훈';
+const CONTACT = 'lyhza@naver.com';
+const EFFECTIVE_DATE = '시행일: 2026년 8월 19일';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -121,7 +123,11 @@ export default function PrivacyPage() {
             <br />
             운영자: {OPERATOR}
             <br />
-            이메일: {CONTACT}
+            {/* 눌러서 바로 보낼 수 있게 — 문의처는 닿기 쉬워야 합니다 */}
+            이메일:{' '}
+            <a href={`mailto:${CONTACT}`} style={{ color: 'var(--grid-deep)' }}>
+              {CONTACT}
+            </a>
           </p>
           <p className="text-xs">
             개인정보 침해에 관한 상담이 필요하면 개인정보침해신고센터(privacy.kisa.or.kr, 국번없이
