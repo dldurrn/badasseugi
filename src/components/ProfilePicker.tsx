@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { PinPad } from '@/components/PinPad';
 import { EmptyState } from '@/components/EmptyState';
 import { MAX_CHILDREN, PIN_LENGTH } from '@/lib/profile';
+import { signOutAndGoToLogin } from '@/lib/sign-out';
 import type { ChildProfile } from '@/lib/types';
 
 /**
@@ -27,9 +28,15 @@ export function ProfilePicker({
 }) {
   const [locked, setLocked] = useState<ChildProfile | null>(null);
   const [askingParent, setAskingParent] = useState(false);
+  const [switchingAccount, setSwitchingAccount] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const switchAccount = async () => {
+    setBusy(true);
+    await signOutAndGoToLogin();
+  };
 
   const enter = useCallback(async (child: ChildProfile, code: string) => {
     setBusy(true);
@@ -239,6 +246,49 @@ export function ProfilePicker({
         <p className="mt-2 text-xs" style={{ color: 'var(--ink-faint)' }}>
           문제 만들기와 리포트는 보호자 화면에 있어요
         </p>
+      </div>
+
+      {/*
+        계정을 갈아타려는 사람은 반드시 이 화면을 지납니다.
+        설정 깊숙이 있는 로그아웃까지 가려면 다섯 걸음이라, 여기에 길을 하나 냅니다.
+        아이는 여기서 자기 얼굴만 누르므로 실수로 눌릴 자리도 아닙니다.
+      */}
+      <div className="mt-5 text-center">
+        {switchingAccount ? (
+          <div className="rise-in">
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+              지금 계정에서 나가고 다른 계정으로 들어가요.
+              <br />
+              지금까지 쌓인 기록은 지워지지 않아요.
+            </p>
+            <div className="mt-3 flex justify-center gap-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setSwitchingAccount(false)}
+                disabled={busy}
+              >
+                그만두기
+              </button>
+              <button
+                className="btn"
+                style={{ background: 'var(--pen)', color: '#fff' }}
+                onClick={switchAccount}
+                disabled={busy}
+              >
+                나가기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="btn btn-quiet text-sm"
+            onClick={() => setSwitchingAccount(true)}
+            disabled={busy}
+            style={{ color: 'var(--ink-soft)' }}
+          >
+            다른 계정으로 로그인
+          </button>
+        )}
       </div>
     </section>
   );
