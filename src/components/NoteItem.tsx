@@ -37,10 +37,20 @@ export function NoteItem({
   // 맞춤법인데 문제은행에서 사라진 항목은 풀 수 없습니다.
   const canPractice = Boolean(childId) && (note.module === 'dictation' || Boolean(question));
 
+  // 받아쓰기를 푸는 동안에는 정답 문장을 가립니다.
+  // 목록에 문장이 그대로 적혀 있으면 듣지 않고 베껴 쓸 수 있어 문제가 성립하지 않습니다.
+  // 맞춤법은 문제 자체를 봐야 풀 수 있으므로 가리지 않습니다.
+  const hideAnswer = open && note.module === 'dictation';
+
   return (
     <li className="surface p-4">
       <div className="flex items-start justify-between gap-3">
-        <span className="flex-1 text-base">{note.content}</span>
+        <span
+          className="flex-1 text-base"
+          style={hideAnswer ? { color: 'var(--ink-faint)' } : undefined}
+        >
+          {hideAnswer ? '들려주는 문장을 받아쓰세요' : note.content}
+        </span>
         <Stars streak={note.streak} />
       </div>
 

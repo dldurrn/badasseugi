@@ -10,8 +10,19 @@ import { createClient } from '@/lib/supabase/server';
  * 비용: 호출마다 과금되므로 가족당 하루 호출 수를 제한합니다.
  */
 
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024; // 6MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+/**
+ * Vercel은 요청 본문이 4.5MB를 넘으면 이 함수에 닿기도 전에 413으로 막습니다.
+ * 인프라 제한이라 코드로 못 늘립니다. 그 아래로 잡아야 우리 안내 문구를 띄울 수 있습니다.
+ * 화면에서 미리 1600px JPEG로 줄여 보내므로 보통 1MB를 넘지 않습니다.
+ */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Anthropic이 받는 형식만 둡니다. HEIC는 거부합니다 —
+ * 넣어 두면 아이폰 사진이 통과했다가 Anthropic 단계에서 실패해
+ * "밝은 곳에서 다시 찍으라"는 엉뚱한 안내를 보게 됩니다.
+ */
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 const EXTRACTION_PROMPT = `이 사진은 한국 초등학교 받아쓰기 문제지입니다. 사진 속 받아쓰기 문장들을 순서대로 추출해 주세요.
 
@@ -75,11 +86,21 @@ export async function POST(request: Request) {
   }
   if (file.size > MAX_IMAGE_BYTES) {
     return NextResponse.json(
-      { error: '사진 용량이 너무 커요. 6MB 이하로 다시 찍어 주세요.' },
+      { error: '사진 용량이 너무 커요. 조금 더 작게 찍거나 직접 입력해 주세요.' },
       { status: 400 },
     );
   }
-  const mediaType = ALLOWED_TYPES.includes(file.type) ? file.type : 'image/jpeg';
+
+  // 형식을 알 수 없으면 짐작하지 않고 막습니다.
+  // 예전에는 모르면 jpeg로 우겼는데, 실제 내용이 png면 Anthropic이
+  // "jpeg라더니 png로 보인다"며 거부해 원인을 알 수 없는 실패가 났습니다.
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return NextResponse.json(
+      { error: '이 사진 형식은 읽을 수 없어요. 사진을 다시 찍거나 직접 입력해 주세요.' },
+      { status: 400 },
+    );
+  }
+  const mediaType = file.type;
 
   const base64 = Buffer.from(await file.arrayBuffer()).toString('base64');
 

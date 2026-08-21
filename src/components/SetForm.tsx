@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
+import { prepareImageForUpload } from '@/lib/prepare-image';
 import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
 
 /**
@@ -82,8 +83,21 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
     setScanning(true);
     setNotice(null);
     try {
+      // 보내기 전에 브라우저에서 줄입니다.
+      // 폰 사진은 그대로 보내면 Vercel의 4.5MB 제한에 걸려 서버에 닿지도 못합니다.
+      let prepared: File;
+      try {
+        prepared = await prepareImageForUpload(file);
+      } catch {
+        setNotice({
+          kind: 'error',
+          text: '이 사진 형식은 읽을 수 없어요. 아이폰이라면 설정 > 카메라 > 포맷을 "높은 호환성"으로 바꾸고 다시 찍어 주세요.',
+        });
+        return;
+      }
+
       const form = new FormData();
-      form.append('image', file);
+      form.append('image', prepared);
       const response = await fetch('/api/ocr', { method: 'POST', body: form });
       const payload = (await response.json().catch(() => null)) as
         | { sentences?: string[]; error?: string }
