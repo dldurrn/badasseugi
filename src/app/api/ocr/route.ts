@@ -30,11 +30,83 @@ const EXTRACTION_PROMPT = `이 사진은 한국 초등학교 받아쓰기 문제
 1. 문제 번호나 괄호는 빼고 문장만 추출합니다.
 2. 마침표, 물음표, 느낌표, 쉼표는 사진에 있는 그대로 유지합니다.
 3. 띄어쓰기도 사진에 보이는 그대로 유지합니다.
-4. 확실히 읽히지 않는 글자가 있으면 그 문장은 제외합니다.
+4. 글자가 전혀 읽히지 않는 문장은 제외합니다.
 
-다른 설명이나 마크다운 없이 오직 JSON 문자열 배열로만 답하세요.
-예: ["오늘은 날씨가 맑습니다.","친구와 함께 놀았어요."]
-문장을 하나도 찾지 못하면 [] 로 답하세요.`;
+받침은 작아서 잘못 읽기 쉽습니다. 특히 ㄴ/ㄷ, ㄹ/ㄼ, ㅅ/ㅆ, ㅈ/ㅊ 을 주의해서 보세요.
+읽은 결과가 실제 한국어 낱말인지 확인하세요.
+한글 자모의 이름은 다음 열넷뿐입니다:
+기역 니은 디귿 리을 미음 비읍 시옷 이응 지읒 치읓 키읔 티읕 피읖 히읗
+
+고칠 것이 있으면 **sentences 에는 고친 뒤의 글자를 넣으세요.**
+그리고 corrections 에 from(사진에서 읽은 원래 글자)과 to(고친 글자)를 함께 남기세요.
+to 는 sentences 의 그 자리에 들어간 값과 정확히 같아야 합니다.
+확신이 서지 않아 고치지 않았다면 sentences 는 그대로 두고 uncertain 에만 남기세요.
+**사진에 없는 내용을 지어내지 마세요.** 고친 것은 전부 corrections 에 드러나야 합니다.
+
+다른 설명이나 마크다운 없이 오직 아래 형태의 JSON 객체로만 답하세요.
+{
+  "sentences": ["아기","우리","ㄷ, 디귿"],
+  "corrections": [{ "index": 2, "from": "ㄷ, 디근", "to": "ㄷ, 디귿", "why": "자모 이름은 '디귿'입니다" }],
+  "uncertain": [{ "index": 0, "why": "글자가 흐려서 확실하지 않습니다" }]
+}
+위 예에서 sentences 의 2번 자리가 "ㄷ, 디근"이 아니라 고친 값 "ㄷ, 디귿"인 것에 주의하세요.
+index 는 sentences 배열에서의 자리(0부터)입니다.
+고친 것이 없으면 corrections 는 [] 로, 미심쩍은 것이 없으면 uncertain 은 [] 로 두세요.
+문장을 하나도 찾지 못하면 sentences 를 [] 로 두세요.`;
+
+/** AI가 고쳐 적은 곳. 부모가 되돌릴 수 있도록 원래 읽은 값도 함께 보냅니다. */
+export interface OcrCorrection {
+  index: number;
+  from: string;
+  to: string;
+  why: string;
+}
+
+/** AI가 확신하지 못한 곳. 고치지는 않았지만 부모가 봐야 합니다. */
+export interface OcrUncertain {
+  index: number;
+  why: string;
+}
+
+/** 짧게 자르고 자리 번호가 실제 문장 범위 안인지 확인합니다. */
+function clip(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
+}
+
+function readCorrections(raw: unknown, count: number): OcrCorrection[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const c = item as Record<string, unknown>;
+      return {
+        index: Number(c?.index),
+        from: clip(c?.from, 200),
+        to: clip(c?.to, 200),
+        why: clip(c?.why, 120),
+      };
+    })
+    .filter(
+      (c) =>
+        Number.isInteger(c.index) &&
+        c.index >= 0 &&
+        c.index < count &&
+        c.to.length > 0 &&
+        // 바뀐 게 없으면 알릴 것도 없습니다.
+        c.from !== c.to,
+    )
+    .slice(0, 30);
+}
+
+function readUncertain(raw: unknown, count: number): OcrUncertain[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const u = item as Record<string, unknown>;
+      return { index: Number(u?.index), why: clip(u?.why, 120) };
+    })
+    .filter((u) => Number.isInteger(u.index) && u.index >= 0 && u.index < count)
+    .slice(0, 30);
+}
 
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -106,6 +178,8 @@ export async function POST(request: Request) {
 
   // Anthropic 호출
   let sentences: string[];
+  let corrections: OcrCorrection[] = [];
+  let uncertain: OcrUncertain[] = [];
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -147,11 +221,22 @@ export async function POST(request: Request) {
       .trim();
 
     const parsed: unknown = JSON.parse(text);
-    if (!Array.isArray(parsed)) throw new Error('예상과 다른 형식');
 
-    sentences = parsed
+    // 예전에는 문자열 배열만 받았습니다. 모델이 옛 형태로 답해도 깨지지 않게 둘 다 받습니다.
+    const rawSentences = Array.isArray(parsed)
+      ? parsed
+      : ((parsed as { sentences?: unknown })?.sentences ?? null);
+    if (!Array.isArray(rawSentences)) throw new Error('예상과 다른 형식');
+
+    sentences = rawSentences
       .map((s) => String(s).replace(/\s+/g, ' ').trim())
       .filter((s) => s.length > 0 && s.length <= 200);
+
+    if (!Array.isArray(parsed)) {
+      const obj = parsed as { corrections?: unknown; uncertain?: unknown };
+      corrections = readCorrections(obj.corrections, sentences.length);
+      uncertain = readUncertain(obj.uncertain, sentences.length);
+    }
   } catch (error) {
     console.error('[ocr] 인식 실패', error);
     return NextResponse.json(
@@ -168,5 +253,5 @@ export async function POST(request: Request) {
       { onConflict: 'family_id,used_on' },
     );
 
-  return NextResponse.json({ sentences });
+  return NextResponse.json({ sentences, corrections, uncertain });
 }

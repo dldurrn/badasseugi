@@ -17,6 +17,23 @@ import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
  * 막다른 길이 되지 않게 하기 위해서입니다.
  */
 
+interface Correction {
+  index: number;
+  from: string;
+  to: string;
+  why: string;
+}
+
+interface Uncertain {
+  index: number;
+  why: string;
+}
+
+interface Review {
+  corrections: Correction[];
+  uncertain: Uncertain[];
+}
+
 interface SetFormProps {
   defaultName: string;
   initial?: { id: string; name: string; sentences: string[] };
@@ -35,8 +52,14 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
   const [notice, setNotice] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [scanning, setScanning] = useState(false);
+  /** 방금 사진에서 가져온 문장 수. 확인을 마치면 0으로 돌아갑니다. */
+  const [justScanned, setJustScanned] = useState(0);
+  /** AI가 고쳤거나 미심쩍어한 곳. 부모가 확인해야 할 자리입니다. */
+  const [review, setReview] = useState<Review>({ corrections: [], uncertain: [] });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  // 앨범과 카메라는 입력칸을 따로 둬야 합니다. capture 속성이 달라서요.
+  const albumRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const filled = sentences.map((s) => s.trim()).filter(Boolean);
   const canSave = name.trim().length > 0 && filled.length > 0 && !busy;
@@ -82,6 +105,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
   const scan = async (file: File) => {
     setScanning(true);
     setNotice(null);
+    setJustScanned(0);
     try {
       // 보내기 전에 브라우저에서 줄입니다.
       // 폰 사진은 그대로 보내면 Vercel의 4.5MB 제한에 걸려 서버에 닿지도 못합니다.
@@ -100,7 +124,12 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
       form.append('image', prepared);
       const response = await fetch('/api/ocr', { method: 'POST', body: form });
       const payload = (await response.json().catch(() => null)) as
-        | { sentences?: string[]; error?: string }
+        | {
+            sentences?: string[];
+            corrections?: Correction[];
+            uncertain?: Uncertain[];
+            error?: string;
+          }
         | null;
 
       if (!response.ok || !payload?.sentences) {
@@ -117,16 +146,26 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         });
         return;
       }
+      // 붙이기 전의 길이를 알아야 AI가 준 자리 번호를 우리 목록 번호로 옮길 수 있습니다.
+      const offset = sentences.filter((s) => s.trim().length > 0).length;
       append(payload.sentences);
-      setNotice({
-        kind: 'info',
-        text: `${payload.sentences.length}문장을 찾았어요. 맞는지 한 번 확인해 주세요.`,
+
+      // 사진 인식은 틀릴 수 있고, 여기 들어간 문장이 그대로 채점 기준이 됩니다.
+      // 부모가 확인하지 않고 저장하면 아이가 맞게 쓰고도 틀렸다는 채점을 받습니다.
+      // 그래서 이 안내만은 눈에 확 띄게 따로 띄웁니다.
+      setNotice(null);
+      setJustScanned(payload.sentences.length);
+      setReview({
+        corrections: (payload.corrections ?? []).map((c) => ({ ...c, index: c.index + offset })),
+        uncertain: (payload.uncertain ?? []).map((u) => ({ ...u, index: u.index + offset })),
       });
     } catch {
       setNotice({ kind: 'error', text: '사진을 보내지 못했어요. 연결을 확인해 주세요.' });
     } finally {
       setScanning(false);
-      if (fileRef.current) fileRef.current.value = '';
+      // 같은 사진을 다시 고를 수 있게 값을 비웁니다.
+      if (albumRef.current) albumRef.current.value = '';
+      if (cameraRef.current) cameraRef.current.value = '';
     }
   };
 
@@ -182,27 +221,53 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
       />
 
       <h2 className="section-title mb-2">문장 넣기</h2>
-      <div className="mb-3 flex gap-2">
+      {/*
+        앨범과 카메라를 버튼 두 개로 나눕니다.
+        `capture` 속성이 붙으면 폰이 카메라를 바로 열고, 없으면 앨범을 엽니다.
+        한 입력칸으로는 둘 다 못 하므로 입력칸도 둘로 나눕니다.
+        (PC에서는 카메라 버튼도 파일 선택창이 열립니다 — 그래서 앨범을 앞에 둡니다.)
+      */}
+      <div className="mb-3 grid grid-cols-2 gap-2">
         <button
           type="button"
-          className="btn btn-secondary flex-1 justify-center"
-          onClick={() => fileRef.current?.click()}
+          className="btn btn-secondary justify-center"
+          onClick={() => albumRef.current?.click()}
           disabled={scanning}
         >
-          {scanning ? '읽는 중…' : '사진에서 가져오기'}
+          {scanning ? '읽는 중…' : '앨범에서 고르기'}
         </button>
         <button
           type="button"
-          className="btn btn-secondary flex-1 justify-center"
-          onClick={() => setShowBulk((v) => !v)}
+          className="btn btn-secondary justify-center"
+          onClick={() => cameraRef.current?.click()}
+          disabled={scanning}
         >
-          여러 줄 붙여넣기
+          {scanning ? '읽는 중…' : '사진 찍기'}
         </button>
       </div>
+      <button
+        type="button"
+        className="btn btn-secondary mb-3 w-full justify-center"
+        onClick={() => setShowBulk((v) => !v)}
+      >
+        여러 줄 붙여넣기
+      </button>
+
       <input
-        ref={fileRef}
+        ref={albumRef}
         type="file"
         accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void scan(file);
+        }}
+      />
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
@@ -223,6 +288,110 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
           />
           <button type="button" className="btn btn-secondary mt-2" onClick={applyBulk}>
             줄마다 문장으로 넣기
+          </button>
+        </div>
+      )}
+
+      {justScanned > 0 && (
+        <div
+          className="rise-in mb-3 rounded p-4"
+          style={{
+            background: 'var(--pen-tint)',
+            border: '2px solid var(--pen)',
+          }}
+          role="status"
+        >
+          <p
+            className="display text-base font-bold"
+            style={{ color: 'var(--pen-deep)', margin: 0 }}
+          >
+            사진에서 {justScanned}문장을 가져왔어요
+          </p>
+          <p
+            className="mt-1.5 text-sm leading-relaxed"
+            style={{ color: 'var(--pen-deep)', margin: '6px 0 0' }}
+          >
+            <b>글자가 맞는지 꼭 확인해 주세요.</b> 사진은 잘못 읽힐 수 있어요.
+            여기 적힌 문장이 그대로 채점 기준이 되기 때문에,
+            틀린 채로 두면 아이가 바르게 쓰고도 틀렸다고 나와요.
+          </p>
+          {/* AI가 고친 곳 — 무엇을 어떻게 바꿨는지 드러내고 되돌릴 길을 줍니다. */}
+          {review.corrections.length > 0 && (
+            <div className="mt-3.5">
+              <p className="text-[13px] font-bold" style={{ color: 'var(--pen-deep)', margin: 0 }}>
+                이렇게 고쳤어요 · 맞는지 봐 주세요
+              </p>
+              <ul className="mt-1.5 flex list-none flex-col gap-1.5 p-0">
+                {review.corrections.map((c) => (
+                  <li
+                    key={`${c.index}-${c.from}`}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-sm px-2.5 py-2 text-[13px]"
+                    style={{ background: 'var(--card)' }}
+                  >
+                    <span className="tabular-nums" style={{ color: 'var(--ink-faint)' }}>
+                      {c.index + 1}번
+                    </span>
+                    <span style={{ color: 'var(--ink-faint)', textDecoration: 'line-through' }}>
+                      {c.from || '(빈칸)'}
+                    </span>
+                    <span aria-hidden="true" style={{ color: 'var(--ink-faint)' }}>
+                      →
+                    </span>
+                    <span className="font-semibold">{c.to}</span>
+                    {c.why && (
+                      <span className="w-full text-[12px]" style={{ color: 'var(--ink-soft)' }}>
+                        {c.why}
+                      </span>
+                    )}
+                    {c.from && (
+                      <button
+                        type="button"
+                        className="ml-auto shrink-0 px-1 text-[12px] font-semibold"
+                        style={{ color: 'var(--pen)' }}
+                        onClick={() => {
+                          update(c.index, c.from);
+                          setReview((r) => ({
+                            ...r,
+                            corrections: r.corrections.filter((x) => x !== c),
+                          }));
+                        }}
+                      >
+                        되돌리기
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* AI도 확신하지 못한 곳 — 고치지는 않았지만 눈으로 봐야 합니다. */}
+          {review.uncertain.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[13px] font-bold" style={{ color: 'var(--pen-deep)', margin: 0 }}>
+                이 줄은 흐려서 확실하지 않아요
+              </p>
+              <ul className="mt-1.5 flex list-none flex-col gap-1 p-0 text-[13px]">
+                {review.uncertain.map((u) => (
+                  <li key={u.index} style={{ color: 'var(--ink-soft)' }}>
+                    <span className="tabular-nums">{u.index + 1}번</span>
+                    {u.why ? ` · ${u.why}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="btn mt-3"
+            style={{ background: 'var(--pen)', color: '#fff' }}
+            onClick={() => {
+              setJustScanned(0);
+              setReview({ corrections: [], uncertain: [] });
+            }}
+          >
+            확인했어요
           </button>
         </div>
       )}

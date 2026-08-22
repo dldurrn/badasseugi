@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ShowGuideAgain } from '@/components/ShowGuideAgain';
 import { readActiveProfile } from '@/lib/profile-server';
 
 /**
@@ -58,6 +59,9 @@ export default async function MorePage() {
             </Link>
           </li>
         ))}
+        <li>
+          <ShowGuideAgain />
+        </li>
       </ul>
     </main>
   );

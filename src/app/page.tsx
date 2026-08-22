@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Onboarding } from '@/components/Onboarding';
 import { getHomeSummary } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
@@ -49,6 +50,9 @@ export default async function HomePage() {
           </span>
         </Link>
       </header>
+
+      {/* 처음 온 사람에게만 보입니다. 한 번 닫으면 더보기에서 다시 열 수 있습니다. */}
+      <Onboarding isParent={isParent} />
 
       <section className="mb-6 grid grid-cols-2 gap-3">
         <Link href="/dictation" className="surface flex flex-col gap-1 p-4">
