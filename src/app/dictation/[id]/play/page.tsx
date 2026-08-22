@@ -15,9 +15,9 @@ export default async function PlaySetPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; r?: string }>;
 }) {
-  const [{ id }, { mode: rawMode }] = await Promise.all([params, searchParams]);
+  const [{ id }, { mode: rawMode, r }] = await Promise.all([params, searchParams]);
 
   const child = await readActiveChild();
   if (!child) redirect('/children');
@@ -29,6 +29,13 @@ export default async function PlaySetPage({
 
   return (
     <DictationRunner
+      /*
+        "한 번 더 풀기"가 붙이는 `r` 값을 key 로 씁니다.
+        주소만 바꾸면 React 가 같은 자리의 같은 부품이라 판단해 재사용하고,
+        안에 든 '결과' 상태가 그대로 남아 결과 화면이 계속 보입니다.
+        key 가 바뀌어야 비로소 새 세션으로 다시 만들어집니다.
+      */
+      key={`${set.id}-${mode}-${r ?? 'first'}`}
       childId={child.id}
       // refId는 문장 원문입니다. 오답노트가 문장 단위로 쌓이도록 맞춘 규약입니다.
       items={set.sentences.map((sentence) => ({ refId: sentence, sentence }))}

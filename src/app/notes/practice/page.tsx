@@ -28,9 +28,9 @@ function pickPool(notes: WrongNote[]): WrongNote[] {
 export default async function NotesPracticePage({
   searchParams,
 }: {
-  searchParams: Promise<{ module?: string }>;
+  searchParams: Promise<{ module?: string; r?: string }>;
 }) {
-  const { module: rawModule } = await searchParams;
+  const { module: rawModule, r } = await searchParams;
   const module: Module = rawModule === 'spelling' ? 'spelling' : 'dictation';
 
   const child = await readActiveChild();
@@ -74,6 +74,8 @@ export default async function NotesPracticePage({
 
     return (
       <SpellingRunner
+        /* "한 번 더 풀기"가 붙이는 r 값이 바뀌어야 새 세션으로 다시 만들어집니다. */
+        key={`notes-spelling-${r ?? 'first'}`}
         childId={child.id}
         questions={questions}
         kind={null}
@@ -88,6 +90,8 @@ export default async function NotesPracticePage({
 
   return (
     <DictationRunner
+      /* "한 번 더 풀기"가 붙이는 r 값이 바뀌어야 새 세션으로 다시 만들어집니다. */
+      key={`notes-dictation-${r ?? 'first'}`}
       childId={child.id}
       items={pool.map((n) => ({ refId: n.refId, sentence: n.content }))}
       mode="practice"

@@ -26,9 +26,9 @@ export default async function SpellingSessionPage({
   searchParams,
 }: {
   params: Promise<{ kind: string }>;
-  searchParams: Promise<{ mode?: string }>;
+  searchParams: Promise<{ mode?: string; r?: string }>;
 }) {
-  const [{ kind }, { mode: rawMode }] = await Promise.all([params, searchParams]);
+  const [{ kind }, { mode: rawMode, r }] = await Promise.all([params, searchParams]);
 
   // `kind in KINDS`로 검사하면 'toString' 같은 상속 속성까지 통과합니다.
   if (!Object.prototype.hasOwnProperty.call(KINDS, kind)) notFound();
@@ -44,6 +44,8 @@ export default async function SpellingSessionPage({
 
   return (
     <SpellingRunner
+      /* "한 번 더 풀기"가 붙이는 r 값이 바뀌어야 새 세션으로 다시 만들어집니다. */
+      key={`${spellingKind}-${mode}-${r ?? 'first'}`}
       childId={child.id}
       questions={questions}
       kind={spellingKind}
