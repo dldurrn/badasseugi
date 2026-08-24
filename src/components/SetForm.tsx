@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { prepareImageForUpload } from '@/lib/prepare-image';
 import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
 
@@ -16,6 +16,160 @@ import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
  * 문장을 넣는 길을 셋으로 둔 것은, 문제지 사진이 잘 안 읽힐 때
  * 막다른 길이 되지 않게 하기 위해서입니다.
  */
+
+/**
+ * 사진 인식은 10초 넘게 걸리기도 합니다.
+ * "읽는 중…" 한 마디만 띄우면 멈춘 것처럼 보여서, 지금 무슨 일이 일어나는지 단계로 보여 줍니다.
+ * 실제 시간이 줄지는 않지만 기다리는 느낌이 크게 달라집니다.
+ */
+type ScanPhase = 'prepare' | 'upload' | 'read';
+
+interface OcrPayload {
+  sentences?: string[];
+  corrections?: Correction[];
+  uncertain?: Uncertain[];
+  error?: string;
+}
+
+/**
+ * fetch 대신 XMLHttpRequest를 쓰는 이유는 하나뿐입니다 — **올려보내는 진행률**.
+ * fetch로는 요청 본문이 얼마나 갔는지 알 수 없어서
+ * "보내는 중"과 "읽는 중"을 나눠 보여 줄 수가 없습니다.
+ * 폰 데이터로 사진을 올리면 이 구간이 몇 초씩 걸리기 때문에 나눌 값어치가 있습니다.
+ */
+function postImage(
+  file: File,
+  onProgress: (percent: number) => void,
+  onSent: () => void,
+): Promise<{ ok: boolean; payload: OcrPayload | null }> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append('image', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/ocr');
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    // 본문을 다 올린 시점 = 서버가 읽기 시작하는 시점입니다.
+    xhr.upload.onload = () => {
+      onProgress(100);
+      onSent();
+    };
+
+    xhr.onload = () => {
+      let payload: OcrPayload | null = null;
+      try {
+        payload = JSON.parse(xhr.responseText) as OcrPayload;
+      } catch {
+        payload = null;
+      }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, payload });
+    };
+    xhr.onerror = () => reject(new Error('network'));
+    xhr.ontimeout = () => reject(new Error('timeout'));
+
+    xhr.send(form);
+  });
+}
+
+const SCAN_STEPS: { phase: ScanPhase; label: string }[] = [
+  { phase: 'prepare', label: '사진 줄이는 중' },
+  { phase: 'upload', label: '보내는 중' },
+  { phase: 'read', label: '글자 읽는 중' },
+];
+
+/**
+ * 어느 단계인지 원고지 칸으로 보여 줍니다.
+ * 채운 칸 = 끝난 것, 테두리 칸 = 지금 하는 것 — 채점 화면과 같은 약속입니다.
+ */
+function ScanProgress({
+  phase,
+  percent,
+  elapsed,
+}: {
+  phase: ScanPhase;
+  percent: number;
+  elapsed: number;
+}) {
+  const now = SCAN_STEPS.findIndex((s) => s.phase === phase);
+
+  return (
+    <div
+      className="mb-3 rounded-sm p-3"
+      style={{ background: 'var(--paper-sunk)', border: '1px solid var(--rule)' }}
+      role="status"
+      aria-live="polite"
+    >
+      <ul className="flex flex-col gap-2">
+        {SCAN_STEPS.map((step, i) => {
+          const done = i < now;
+          const current = i === now;
+          return (
+            <li key={step.phase} className="flex items-center gap-2.5 text-sm">
+              <span
+                aria-hidden="true"
+                className="grid h-5 w-5 shrink-0 place-content-center rounded-sm text-[11px] font-bold"
+                style={
+                  done
+                    ? { background: 'var(--grid)', color: 'var(--card)' }
+                    : current
+                      ? { border: '1.5px solid var(--grid)', color: 'var(--grid-deep)' }
+                      : { border: '1px solid var(--rule-strong)', color: 'var(--ink-faint)' }
+                }
+              >
+                {done ? '✓' : i + 1}
+              </span>
+              <span
+                style={{
+                  color: current ? 'var(--ink)' : done ? 'var(--ink-soft)' : 'var(--ink-faint)',
+                  fontWeight: current ? 700 : 400,
+                }}
+              >
+                {step.label}
+              </span>
+
+              {/* 올려보내는 중에는 얼마나 갔는지 막대로 보여 줍니다 */}
+              {step.phase === 'upload' && current && (
+                <span className="flex flex-1 items-center gap-2">
+                  <span
+                    className="h-1.5 flex-1 overflow-hidden rounded-full"
+                    style={{ background: 'var(--rule-strong)' }}
+                  >
+                    <span
+                      className="block h-full rounded-full"
+                      style={{ width: `${percent}%`, background: 'var(--grid)' }}
+                    />
+                  </span>
+                  <span
+                    className="tabular-nums text-xs"
+                    style={{ color: 'var(--ink-soft)', minWidth: '2.5rem', textAlign: 'right' }}
+                  >
+                    {percent}%
+                  </span>
+                </span>
+              )}
+
+              {/* 읽는 동안은 진행률을 알 수 없어서, 멈춘 게 아니라는 표시로 초를 셉니다 */}
+              {step.phase === 'read' && current && (
+                <span className="tabular-nums text-xs" style={{ color: 'var(--ink-soft)' }}>
+                  {elapsed}초
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {phase === 'read' && (
+        <p className="mt-2.5 text-xs" style={{ color: 'var(--ink-faint)' }}>
+          글자가 많으면 20초까지 걸리기도 해요. 그대로 두고 기다려 주세요.
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface Correction {
   index: number;
@@ -51,7 +205,10 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
   const [showBulk, setShowBulk] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [scanning, setScanning] = useState(false);
+  const [phase, setPhase] = useState<ScanPhase | null>(null);
+  const [percent, setPercent] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const scanning = phase !== null;
   /** 방금 사진에서 가져온 문장 수. 확인을 마치면 0으로 돌아갑니다. */
   const [justScanned, setJustScanned] = useState(0);
   /** AI가 고쳤거나 미심쩍어한 곳. 부모가 확인해야 할 자리입니다. */
@@ -102,8 +259,20 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
     setNotice({ kind: 'info', text: `${list.length}문장을 넣었어요.` });
   };
 
+  // "글자 읽는 중"일 때만 초를 셉니다. 앞 단계는 금방 지나가서 셀 것도 없습니다.
+  useEffect(() => {
+    if (phase !== 'read') return;
+    const started = Date.now();
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - started) / 1000));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [phase]);
+
   const scan = async (file: File) => {
-    setScanning(true);
+    setPhase('prepare');
+    setPercent(0);
+    setElapsed(0);
     setNotice(null);
     setJustScanned(0);
     try {
@@ -120,19 +289,10 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         return;
       }
 
-      const form = new FormData();
-      form.append('image', prepared);
-      const response = await fetch('/api/ocr', { method: 'POST', body: form });
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            sentences?: string[];
-            corrections?: Correction[];
-            uncertain?: Uncertain[];
-            error?: string;
-          }
-        | null;
+      setPhase('upload');
+      const { ok, payload } = await postImage(prepared, setPercent, () => setPhase('read'));
 
-      if (!response.ok || !payload?.sentences) {
+      if (!ok || !payload?.sentences) {
         setNotice({
           kind: 'error',
           text: payload?.error ?? '사진을 읽지 못했어요. 직접 입력으로 넣어 주세요.',
@@ -162,7 +322,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
     } catch {
       setNotice({ kind: 'error', text: '사진을 보내지 못했어요. 연결을 확인해 주세요.' });
     } finally {
-      setScanning(false);
+      setPhase(null);
       // 같은 사진을 다시 고를 수 있게 값을 비웁니다.
       if (albumRef.current) albumRef.current.value = '';
       if (cameraRef.current) cameraRef.current.value = '';
@@ -245,6 +405,8 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
           {scanning ? '읽는 중…' : '사진 찍기'}
         </button>
       </div>
+
+      {phase && <ScanProgress phase={phase} percent={percent} elapsed={elapsed} />}
       <button
         type="button"
         className="btn btn-secondary mb-3 w-full justify-center"
