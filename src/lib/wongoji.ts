@@ -20,9 +20,13 @@ export const WONGOJI_COLS = 15;
 
 /**
  * 처음에 깔아 두는 줄 수.
- * 정답 길이만큼 칸을 주면 글자 수를 알려주는 셈이라, 문장과 무관하게 늘 같은 크기로 깝니다.
+ *
+ * 한 줄입니다. 내장 문장 200개를 재 보니 중앙값이 7칸이고 열에 아홉은 한 줄에 들어갑니다.
+ * 넉넉하게 네 줄을 깔아 두면 빈 칸이 마흔 개씩 남아 휑하고, 확인 버튼도 저 아래로 밀립니다.
+ * 모자라면 `growingGrid`가 그때 늘려 줍니다 —
+ * 늘어나는 기준이 정답 길이가 아니라 **아이가 쓴 만큼**이라 글자 수가 새지 않습니다.
  */
-export const WONGOJI_MIN_ROWS = 4;
+export const WONGOJI_MIN_ROWS = 1;
 
 /** 넘칠 때 늘어나는 한계. 문장 상한(200자)을 담고도 남습니다. */
 export const WONGOJI_MAX_ROWS = 14;
@@ -117,6 +121,18 @@ export function toText(cells: string[]): string {
   return tidy(out);
 }
 
+/**
+ * 지금 쓰고 있는 칸이 어디인지.
+ *
+ * 조합 중이면 **마지막 글자가 놓인 칸**입니다.
+ * `ㄱ → 가 → 각`은 아직 확정된 글자가 아닌데 이걸 다 쓴 것으로 치면
+ * 커서만 먼저 다음 칸으로 가서, 쓰는 자리와 표시가 어긋납니다.
+ */
+export function writingCursor(cellCount: number, composing: boolean): number {
+  if (composing && cellCount > 0) return cellCount - 1;
+  return cellCount;
+}
+
 /** 격자를 채우고 남는 자리는 빈 칸으로 둡니다. 늘 같은 크기로 보이게 하려는 것입니다. */
 export function padToGrid(
   cells: string[],
@@ -133,10 +149,13 @@ export function padToGrid(
 }
 
 /**
- * 쓰는 중에는 한 줄을 미리 더 깔아 둡니다.
- * 마지막 줄을 채우는 순간 칸이 없어 보이면 아이가 "여기까지인가?" 하고 멈춥니다.
+ * 쓰는 중에 쓰는 격자.
+ *
+ * 한 줄로 시작해서, **지금 줄을 다 채웠을 때만** 다음 줄이 생깁니다.
+ * 미리 여러 줄을 깔아 두지 않는 이유는 빈 줄이 "여기까지 써야 하나?" 하고 읽히기 때문입니다.
  */
 export function growingGrid(cells: string[], cols = WONGOJI_COLS): string[] {
-  const used = Math.ceil((cells.length + 1) / cols);
-  return padToGrid(cells, Math.max(WONGOJI_MIN_ROWS, used + 1), cols);
+  const used = Math.max(1, Math.ceil(cells.length / cols));
+  const rowIsFull = cells.length > 0 && cells.length % cols === 0;
+  return padToGrid(cells, rowIsFull ? used + 1 : used, cols);
 }

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { prepareImageForUpload } from '@/lib/prepare-image';
 import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
-import { padToGrid, toCells } from '@/lib/wongoji';
+import { padToGrid, toCells, WONGOJI_COLS } from '@/lib/wongoji';
 import { readSetView, saveSetView, type SetView } from '@/lib/write-mode';
 import { WongojiSheet } from './WongojiSheet';
 
@@ -572,7 +572,9 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
       {filled.length > 0 && (
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs" style={{ color: 'var(--ink-faint)' }}>
-            {view === 'wongoji' ? '아이에게 이렇게 보여요' : '문장을 그대로 적어 주세요'}
+            {view === 'wongoji'
+              ? '아이에게 이렇게 보여요 · 한 줄은 15칸'
+              : '문장을 그대로 적어 주세요'}
           </span>
           <button
             type="button"
@@ -590,26 +592,35 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
 
       {view === 'wongoji' && filled.length > 0 ? (
         <ul className="mb-3 flex flex-col gap-3">
-          {filled.map((sentence, index) => (
-            <li key={index}>
-              <div className="mb-1 flex items-baseline gap-1.5">
-                <span
-                  className="text-xs tabular-nums"
-                  style={{ color: 'var(--ink-faint)' }}
-                >
-                  {index + 1}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
-                  {sentence}
-                </span>
-              </div>
-              <WongojiSheet
-                cells={padToGrid(toCells(sentence), 1)}
-                markPunct
-                label={`${index + 1}번째 문장 원고지`}
-              />
-            </li>
-          ))}
+          {filled.map((sentence, index) => {
+            const cells = toCells(sentence);
+            // 몇 줄이 되는지 부모가 만들면서 알아야 합니다.
+            // 두 줄이 되면 아이 화면에서 확인 버튼이 아래로 밀립니다.
+            const rows = Math.max(1, Math.ceil(cells.length / WONGOJI_COLS));
+            return (
+              <li key={index}>
+                <div className="mb-1 flex items-baseline gap-1.5">
+                  <span className="text-xs tabular-nums" style={{ color: 'var(--ink-faint)' }}>
+                    {index + 1}
+                  </span>
+                  <span className="flex-1 truncate text-xs" style={{ color: 'var(--ink-soft)' }}>
+                    {sentence}
+                  </span>
+                  <span
+                    className="shrink-0 text-xs tabular-nums"
+                    style={{ color: rows > 1 ? 'var(--pen)' : 'var(--ink-faint)' }}
+                  >
+                    {cells.length}칸{rows > 1 && ` · ${rows}줄`}
+                  </span>
+                </div>
+                <WongojiSheet
+                  cells={padToGrid(cells, 1)}
+                  markPunct
+                  label={`${index + 1}번째 문장 원고지`}
+                />
+              </li>
+            );
+          })}
         </ul>
       ) : (
       <ul className="mb-3 flex flex-col gap-2">

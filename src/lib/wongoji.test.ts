@@ -9,6 +9,7 @@ import {
   padToGrid,
   toCells,
   toText,
+  writingCursor,
 } from './wongoji';
 
 /**
@@ -110,6 +111,33 @@ describe('왕복 — 내장 문제 전체', () => {
     expect(broken).toEqual([]);
   });
 
+  /**
+   * 20급을 뺀 모든 문장은 원고지 한 줄에 들어가야 합니다.
+   * 학교 문제지가 문장 하나에 한 줄이고, 두 줄이 되면 확인 버튼이 아래로 밀립니다.
+   *
+   * 20급만 예외입니다. 거기는 **두 문장을 이어 받아쓰는 것**이 목적이라
+   * 칸에 맞추려고 줄이면 마지막 급수가 마지막 급수가 아니게 됩니다.
+   */
+  it('20급을 뺀 문장은 모두 한 줄에 들어간다', () => {
+    const over: string[] = [];
+
+    for (const set of DICTATION_BANK) {
+      if (set.id === 'lv20') continue;
+      for (const sentence of set.sentences) {
+        const n = toCells(sentence).length;
+        if (n > WONGOJI_COLS) over.push(`${set.name} ${n}칸 — ${sentence}`);
+      }
+    }
+
+    expect(over).toEqual([]);
+  });
+
+  it('20급은 일부러 두 줄짜리를 둔다', () => {
+    const lv20 = DICTATION_BANK.find((s) => s.id === 'lv20');
+    const long = lv20!.sentences.filter((s) => toCells(s).length > WONGOJI_COLS);
+    expect(long.length).toBeGreaterThan(0);
+  });
+
   it('칸에 담기지 않는 문장이 없다', () => {
     for (const sentence of sentences) {
       expect(toCells(sentence).length).toBeLessThanOrEqual(
@@ -142,6 +170,30 @@ describe('왕복 — 까다로운 문장', () => {
   }
 });
 
+describe('커서 — 조합 중에는 쓰던 칸에 머문다', () => {
+  it('아무것도 안 썼으면 첫 칸', () => {
+    expect(writingCursor(0, false)).toBe(0);
+  });
+
+  it('「가」를 조합하는 중이면 커서는 그 「가」 칸에 있다', () => {
+    // 예전에는 여기서 1을 돌려줘, 쓰고 있는 칸과 커서가 어긋났습니다.
+    expect(writingCursor(toCells('가').length, true)).toBe(0);
+  });
+
+  it('글자가 확정되면 다음 칸으로 넘어간다', () => {
+    expect(writingCursor(toCells('가').length, false)).toBe(1);
+  });
+
+  it('여러 글자를 쓴 뒤 조합 중이어도 마지막 칸에 머문다', () => {
+    expect(writingCursor(toCells('눈처럼 하').length, true)).toBe(4);
+    expect(writingCursor(toCells('눈처럼 하').length, false)).toBe(5);
+  });
+
+  it('조합 중인데 아직 글자가 없으면 첫 칸에 머문다', () => {
+    expect(writingCursor(0, true)).toBe(0);
+  });
+});
+
 describe('격자 만들기', () => {
   it('짧은 문장도 늘 같은 크기로 깐다', () => {
     // 칸 수가 곧 글자 수가 되면 정답을 알려주는 셈입니다.
@@ -156,9 +208,23 @@ describe('격자 만들기', () => {
     expect(padToGrid(cells).length).toBe(WONGOJI_COLS * 5);
   });
 
-  it('쓰는 중에는 한 줄을 미리 더 깔아 둔다', () => {
-    const cells = toCells('가'.repeat(WONGOJI_COLS * 2));
-    expect(growingGrid(cells).length).toBeGreaterThan(cells.length);
+  it('쓰기 전에는 한 줄만 깔아 둔다', () => {
+    expect(growingGrid([]).length).toBe(WONGOJI_COLS);
+  });
+
+  it('한 줄이 아직 안 찼으면 줄이 늘지 않는다', () => {
+    expect(growingGrid(toCells('가나다')).length).toBe(WONGOJI_COLS);
+  });
+
+  it('한 줄을 다 채우면 다음 줄이 생긴다', () => {
+    const full = toCells('가'.repeat(WONGOJI_COLS));
+    expect(full.length).toBe(WONGOJI_COLS);
+    expect(growingGrid(full).length).toBe(WONGOJI_COLS * 2);
+  });
+
+  it('두 줄째를 쓰는 중에는 세 줄이 되지 않는다', () => {
+    const cells = toCells('가'.repeat(WONGOJI_COLS + 3));
+    expect(growingGrid(cells).length).toBe(WONGOJI_COLS * 2);
   });
 
   it('격자에 담아도 문장은 그대로다', () => {

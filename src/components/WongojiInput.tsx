@@ -2,7 +2,7 @@
 
 import type { RefObject } from 'react';
 import { useState } from 'react';
-import { growingGrid, toCells } from '@/lib/wongoji';
+import { growingGrid, toCells, writingCursor } from '@/lib/wongoji';
 import { WongojiSheet } from './WongojiSheet';
 
 /**
@@ -40,16 +40,13 @@ export function WongojiInput({
 
   const cells = toCells(value);
   const grid = growingGrid(cells);
-  const cursor = Math.min(cells.length, grid.length - 1);
+
+  const cursor = Math.min(writingCursor(cells.length, composing), grid.length - 1);
+  const composingAt = composing && cells.length > 0 ? cursor : undefined;
 
   return (
     <div className="wg-input-wrap">
-      <WongojiSheet
-        cells={grid}
-        cursor={cursor}
-        composingAt={composing && cells.length > 0 ? cells.length - 1 : undefined}
-        label="답을 쓰는 원고지"
-      />
+      <WongojiSheet cells={grid} cursor={cursor} composingAt={composingAt} label="답을 쓰는 원고지" />
       <input
         id="answer"
         ref={inputRef}
