@@ -12,7 +12,9 @@ import {
 import { sfx } from '@/lib/sfx';
 import { appSpeech, RATES, readRate, writeRate } from '@/lib/tts-app';
 import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
+import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
 import { GradeSheet } from './GradeSheet';
+import { WongojiInput } from './WongojiInput';
 import type { Mode } from '@/lib/types';
 
 /**
@@ -66,6 +68,7 @@ export function DictationSession({
   // 서버에서 그릴 때는 localStorage를 읽을 수 없어 기본값으로 두고, 뜬 뒤에 저장된 값을 불러옵니다.
   const [rate, setRate] = useState<SpeechRate>(0.85);
   const [speaking, setSpeaking] = useState<ReadingStyle | null>(null);
+  const [writeMode, setWriteMode] = useState<WriteMode>('wongoji');
 
   const inputRef = useRef<HTMLInputElement>(null);
   // 서버(Google TTS)를 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
@@ -80,6 +83,9 @@ export function DictationSession({
   useLeaveGuard(started && !completedRef.current, LEAVE_MESSAGE);
 
   useEffect(() => setRate(readRate()), []);
+
+  // 서버가 그린 화면과 어긋나지 않게, 저장된 쓰기 모드는 화면이 뜬 뒤에 읽습니다.
+  useEffect(() => setWriteMode(readWriteMode()), []);
 
   useEffect(() => () => speech.stop(), [speech]);
 
@@ -270,29 +276,52 @@ export function DictationSession({
       {/* 입력 */}
       {phase === 'writing' && (
         <>
-          <label
-            htmlFor="answer"
-            className="mb-2 block text-sm"
-            style={{ color: 'var(--ink-soft)' }}
-          >
-            들은 문장을 써 보세요
-          </label>
-          <input
-            id="answer"
-            ref={inputRef}
-            className="field field-answer"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') askConfirm();
-            }}
-            placeholder="여기에 써요"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            enterKeyHint="done"
-          />
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label htmlFor="answer" className="text-sm" style={{ color: 'var(--ink-soft)' }}>
+              들은 문장을 써 보세요
+            </label>
+            {/*
+              세션 화면에도 두는 이유는, 막상 써 보고 불편할 때
+              화면을 빠져나가지 않고 그 자리에서 바꿀 수 있어야 하기 때문입니다.
+            */}
+            <button
+              type="button"
+              className="btn btn-quiet text-xs"
+              onClick={() => {
+                const next = writeMode === 'wongoji' ? 'plain' : 'wongoji';
+                setWriteMode(next);
+                saveWriteMode(next);
+              }}
+            >
+              {writeMode === 'wongoji' ? '그냥 쓰기' : '원고지에 쓰기'}
+            </button>
+          </div>
+
+          {writeMode === 'wongoji' ? (
+            <WongojiInput
+              value={typed}
+              onChange={setTyped}
+              onEnter={askConfirm}
+              inputRef={inputRef}
+            />
+          ) : (
+            <input
+              id="answer"
+              ref={inputRef}
+              className="field field-answer"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') askConfirm();
+              }}
+              placeholder="여기에 써요"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              enterKeyHint="done"
+            />
+          )}
           <button
             onClick={askConfirm}
             disabled={!typed.trim()}

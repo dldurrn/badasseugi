@@ -4,6 +4,7 @@ import { SignOutButton } from '@/components/SignOutButton';
 import { SoundToggle } from '@/components/SoundToggle';
 import { RateSettings } from '@/components/RateSettings';
 import { VoiceSettings } from '@/components/VoiceSettings';
+import { WriteModeSettings } from '@/components/WriteModeSettings';
 import { MAX_CHILDREN } from '@/lib/profile';
 import { isParentLocked, listChildren, readActiveProfile } from '@/lib/profile-server';
 import { createClient } from '@/lib/supabase/server';
@@ -49,6 +50,8 @@ export default async function SettingsPage() {
 
       {/* 음성 서비스가 설정되어 있을 때만 나타납니다 */}
       <VoiceSettings />
+
+      <WriteModeSettings />
 
       {isParent ? (
         <>

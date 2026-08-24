@@ -10,6 +10,8 @@ import { initSfx, sfx } from '@/lib/sfx';
 import { SpeechController } from '@/lib/tts';
 import { appSpeech, readRate } from '@/lib/tts-app';
 import type { Module } from '@/lib/types';
+import { readWriteMode, type WriteMode } from '@/lib/write-mode';
+import { WongojiInput } from './WongojiInput';
 
 /**
  * 오답노트 목록에서 그 자리 풀기.
@@ -50,6 +52,8 @@ export function InlineNotePractice({
   const [typed, setTyped] = useState('');
   const [choice, setChoice] = useState<string | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
+  const [writeMode, setWriteMode] = useState<WriteMode>('wongoji');
+  useEffect(() => setWriteMode(readWriteMode()), []);
   const [correct, setCorrect] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -288,21 +292,33 @@ export function InlineNotePractice({
               또박또박
             </button>
           </div>
-          <input
-            ref={inputRef}
-            className="field field-answer"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && canConfirm) setPhase('confirming');
-            }}
-            placeholder="들은 문장을 써요"
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            enterKeyHint="done"
-          />
+          {/* 세션 화면과 같은 쓰기 모드를 씁니다. 여기만 다르면 아이가 헷갈립니다. */}
+          {writeMode === 'wongoji' ? (
+            <WongojiInput
+              value={typed}
+              onChange={setTyped}
+              onEnter={() => {
+                if (canConfirm) setPhase('confirming');
+              }}
+              inputRef={inputRef}
+            />
+          ) : (
+            <input
+              ref={inputRef}
+              className="field field-answer"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && canConfirm) setPhase('confirming');
+              }}
+              placeholder="들은 문장을 써요"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              enterKeyHint="done"
+            />
+          )}
         </>
       )}
 

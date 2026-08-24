@@ -4,6 +4,9 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { prepareImageForUpload } from '@/lib/prepare-image';
 import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
+import { padToGrid, toCells } from '@/lib/wongoji';
+import { readSetView, saveSetView, type SetView } from '@/lib/write-mode';
+import { WongojiSheet } from './WongojiSheet';
 
 /**
  * 받아쓰기 세트 만들기·고치기 (보호자 화면).
@@ -209,6 +212,10 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
   const [percent, setPercent] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const scanning = phase !== null;
+
+  // 서버가 그린 화면과 어긋나지 않게, 저장된 보기는 화면이 뜬 뒤에 읽습니다.
+  const [view, setView] = useState<SetView>('plain');
+  useEffect(() => setView(readSetView()), []);
   /** 방금 사진에서 가져온 문장 수. 확인을 마치면 0으로 돌아갑니다. */
   const [justScanned, setJustScanned] = useState(0);
   /** AI가 고쳤거나 미심쩍어한 곳. 부모가 확인해야 할 자리입니다. */
@@ -558,6 +565,53 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         </div>
       )}
 
+      {/*
+        학교 문제지가 원고지라, 사진과 화면을 나란히 놓고 칸을 세어 대조할 수 있게 합니다.
+        띄어쓰기가 하나 흘렀을 때 글자를 다시 읽는 것보다 칸이 어긋난 걸 보는 쪽이 빠릅니다.
+      */}
+      {filled.length > 0 && (
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--ink-faint)' }}>
+            {view === 'wongoji' ? '아이에게 이렇게 보여요' : '문장을 그대로 적어 주세요'}
+          </span>
+          <button
+            type="button"
+            className="btn btn-quiet text-xs"
+            onClick={() => {
+              const next = view === 'wongoji' ? 'plain' : 'wongoji';
+              setView(next);
+              saveSetView(next);
+            }}
+          >
+            {view === 'wongoji' ? '고치러 가기' : '원고지로 보기'}
+          </button>
+        </div>
+      )}
+
+      {view === 'wongoji' && filled.length > 0 ? (
+        <ul className="mb-3 flex flex-col gap-3">
+          {filled.map((sentence, index) => (
+            <li key={index}>
+              <div className="mb-1 flex items-baseline gap-1.5">
+                <span
+                  className="text-xs tabular-nums"
+                  style={{ color: 'var(--ink-faint)' }}
+                >
+                  {index + 1}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
+                  {sentence}
+                </span>
+              </div>
+              <WongojiSheet
+                cells={padToGrid(toCells(sentence), 1)}
+                markPunct
+                label={`${index + 1}번째 문장 원고지`}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : (
       <ul className="mb-3 flex flex-col gap-2">
         {sentences.map((sentence, index) => (
           <li key={index} className="flex items-center gap-1.5">
@@ -611,13 +665,14 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
           </li>
         ))}
       </ul>
+      )}
 
       <div className="mb-6 flex items-center justify-between">
         <button
           type="button"
           className="btn btn-quiet"
           onClick={() => setSentences((prev) => [...prev, ''])}
-          disabled={sentences.length >= MAX_SENTENCES}
+          disabled={sentences.length >= MAX_SENTENCES || view === 'wongoji'}
         >
           ＋ 문장 추가
         </button>

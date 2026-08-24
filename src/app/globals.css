@@ -271,6 +271,99 @@
     color: var(--ink-faint);
   }
 
+  /* ---------- 원고지 (쓰기·미리보기) ----------
+     채점 화면의 `.grid-cell`과 다른 물건입니다.
+     저기는 낱낱의 칸을 떼어 견주는 자리고, 여기는 이어 붙은 격자 그 자체입니다.
+     학교 문제지와 맞춰 한 줄 15칸으로 둡니다. */
+  .wg {
+    display: grid;
+    grid-template-columns: repeat(var(--wg-cols, 15), minmax(0, 1fr));
+    gap: 1px;
+    background: rgba(46, 125, 91, 0.3);
+    border: 1px solid rgba(46, 125, 91, 0.45);
+    border-radius: 4px;
+    overflow: hidden;
+    width: 100%;
+    /* 넓은 화면에서 15칸을 끝까지 늘리면 칸만 커지고 글자는 그대로라 휑해집니다.
+       칸이 34px쯤에서 멈추도록 잡고 가운데에 둡니다. 종이 원고지의 칸 크기와 비슷합니다. */
+    max-width: 528px;
+    margin-inline: auto;
+  }
+
+  .wg-cell {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card);
+    color: var(--ink);
+    font-family: 'Gowun Batang', 'Nanum Myeongjo', serif;
+    /* 15칸이라 폰에서는 칸이 20px 안팎까지 좁아집니다(375px 화면 기준 19px).
+       칸에 견주어 글자를 넉넉히 채워야 저학년이 읽을 수 있습니다.
+       한글 글자는 font-size와 거의 같은 폭을 차지하므로 칸의 4분의 3까지는 안전합니다. */
+    font-size: clamp(14px, 3.9vw, 24px);
+    line-height: 1;
+    border: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 지금 쓸 자리 */
+  .wg-cell--cursor {
+    box-shadow: inset 0 0 0 2px var(--grid);
+    background: var(--grid-tint);
+  }
+
+  /* 아직 조합 중인 글자 (ㅇ → 여 → 예) */
+  .wg-cell--ime {
+    color: var(--ink-faint);
+  }
+
+  /* 미리보기에서 문장부호를 짚어 주는 표시 */
+  .wg-cell--punct {
+    color: var(--pen);
+  }
+
+  /* 격자 위에 입력칸을 투명하게 덮습니다.
+     아이가 칸을 누르면 곧 입력칸을 누른 것이라 키보드가 그대로 올라옵니다.
+     display:none이나 visibility:hidden은 포커스를 못 받아 쓸 수 없습니다. */
+  .wg-input-wrap {
+    position: relative;
+  }
+
+  .wg-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    border: 0;
+    background: transparent;
+    /* iOS는 글자가 16px보다 작은 입력칸에 닿으면 화면을 확대합니다 */
+    font-size: 16px;
+    padding: 0;
+    caret-color: transparent;
+  }
+
+  .wg-input:focus {
+    outline: none;
+  }
+
+  /* 키보드로 옮겨 왔을 때도 어디에 있는지 보이게 격자에 테를 둘러 줍니다 */
+  .wg-input:focus-visible + .wg,
+  .wg-input-wrap:focus-within .wg {
+    box-shadow: 0 0 0 2px var(--grid-tint);
+  }
+
+  button.wg-cell {
+    cursor: pointer;
+  }
+
+  button.wg-cell:focus-visible {
+    outline: 2px solid var(--grid);
+    outline-offset: -2px;
+  }
+
   /* ---------- 유형 태그 ---------- */
   .tag {
     display: inline-flex;
