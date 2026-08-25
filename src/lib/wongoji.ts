@@ -122,6 +122,25 @@ export function toText(cells: string[]): string {
 }
 
 /**
+ * 아이가 쓰는 중의 칸.
+ *
+ * `toCells`와 달리 **다듬지 않고 누른 대로 옮깁니다.**
+ *
+ * `toCells`는 채점을 위해 끝의 공백을 잘라 내는데, 그 함수를 쓰는 화면에 그대로 썼더니
+ * 스페이스를 눌러도 칸이 생기지 않아 커서가 제자리에 머물렀습니다.
+ * 아이 눈에는 띄어쓰기가 안 먹는 것으로 보입니다.
+ *
+ * 쉼표 뒤 공백도 흡수하지 않습니다. 원고지 규칙을 아는 아이는 붙여 쓸 것이고
+ * 모르는 아이는 한 칸 띄울 텐데, `toText`가 어느 쪽이든 같은 문장으로 되돌립니다.
+ * 스페이스를 두 번 눌러도 채점은 `normalize()`가 한 칸으로 봅니다.
+ */
+export function toWritingCells(text: string): string[] {
+  return Array.from((text ?? '').normalize('NFC')).map((ch) =>
+    ch.trim() === '' ? EMPTY : ch,
+  );
+}
+
+/**
  * 지금 쓰고 있는 칸이 어디인지.
  *
  * 조합 중이면 **마지막 글자가 놓인 칸**입니다.

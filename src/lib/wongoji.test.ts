@@ -9,6 +9,7 @@ import {
   padToGrid,
   toCells,
   toText,
+  toWritingCells,
   writingCursor,
 } from './wongoji';
 
@@ -168,6 +169,35 @@ describe('왕복 — 까다로운 문장', () => {
       expect(toText(toCells(sentence))).toBe(normalize(sentence));
     });
   }
+});
+
+describe('쓰는 중의 칸 — 누른 대로 남는다', () => {
+  it('띄어쓰기를 누르면 빈 칸이 생긴다', () => {
+    // 예전에는 끝의 공백이 잘려서 스페이스가 안 먹는 것처럼 보였습니다.
+    expect(toWritingCells('가 ')).toEqual(['가', EMPTY]);
+    expect(writingCursor(toWritingCells('가 ').length, false)).toBe(2);
+  });
+
+  it('두 번 누르면 빈 칸도 두 개', () => {
+    expect(toWritingCells('가  ')).toEqual(['가', EMPTY, EMPTY]);
+  });
+
+  it('쉼표 뒤 공백을 흡수하지 않는다', () => {
+    expect(toWritingCells('호로록, ')).toEqual(['호', '로', '록', ',', EMPTY]);
+  });
+
+  it('쉼표를 붙여 써도 띄어 써도 같은 문장이 된다', () => {
+    expect(toText(toWritingCells('호로록,한'))).toBe('호로록, 한');
+    expect(toText(toWritingCells('호로록, 한'))).toBe('호로록, 한');
+  });
+
+  it('두 번 띄어 써도 채점 문장은 한 칸이다', () => {
+    expect(normalize(toText(toWritingCells('가  나')))).toBe('가 나');
+  });
+
+  it('아무것도 안 쓰면 칸도 없다', () => {
+    expect(toWritingCells('')).toEqual([]);
+  });
 });
 
 describe('커서 — 조합 중에는 쓰던 칸에 머문다', () => {

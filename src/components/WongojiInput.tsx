@@ -2,7 +2,7 @@
 
 import type { RefObject } from 'react';
 import { useState } from 'react';
-import { growingGrid, toCells, writingCursor } from '@/lib/wongoji';
+import { growingGrid, toWritingCells, writingCursor } from '@/lib/wongoji';
 import { WongojiSheet } from './WongojiSheet';
 
 /**
@@ -38,7 +38,9 @@ export function WongojiInput({
   // 조합 중인 글자는 옅게 그려서, 아직 확정되지 않았다는 걸 보여 줍니다.
   const [composing, setComposing] = useState(false);
 
-  const cells = toCells(value);
+  // 채점용 `toCells`가 아니라 쓰기용을 씁니다 — 끝의 스페이스가 칸으로 남아야
+  // 띄어쓰기를 눌렀을 때 커서가 다음 칸으로 넘어갑니다.
+  const cells = toWritingCells(value);
   const grid = growingGrid(cells);
 
   const cursor = Math.min(writingCursor(cells.length, composing), grid.length - 1);

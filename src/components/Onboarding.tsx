@@ -79,8 +79,11 @@ export function Onboarding({ isParent }: { isParent: boolean }) {
   // 그전에 잠깐 보였다 사라지면 깜빡이므로 아예 아무것도 그리지 않습니다.
   const [ready, setReady] = useState(false);
   const [show, setShow] = useState(false);
+  const [step, setStep] = useState(0);
 
   const key = `${STORAGE_PREFIX}${isParent ? 'parent' : 'child'}`;
+  const steps = isParent ? PARENT_STEPS : CHILD_STEPS;
+  const last = step === steps.length - 1;
 
   useEffect(() => {
     setShow(window.localStorage.getItem(key) !== '1');
@@ -92,9 +95,26 @@ export function Onboarding({ isParent }: { isParent: boolean }) {
     setShow(false);
   };
 
+  const back = () => setStep((s) => Math.max(0, s - 1));
+  const forward = () => {
+    if (last) dismiss();
+    else setStep((s) => s + 1);
+  };
+
+  // 화살표로도 넘길 수 있게 합니다. 버튼만 두면 키보드로 읽는 사람이 번거롭습니다.
+  useEffect(() => {
+    if (!show) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') back();
+      if (e.key === 'ArrowRight') setStep((s) => Math.min(steps.length - 1, s + 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [show, steps.length]);
+
   if (!ready || !show) return null;
 
-  const steps = isParent ? PARENT_STEPS : CHILD_STEPS;
+  const current = steps[step];
 
   return (
     <section
@@ -110,32 +130,57 @@ export function Onboarding({ isParent }: { isParent: boolean }) {
         {isParent ? '처음이시죠? 이렇게 쓰면 돼요' : '이렇게 하면 돼요'}
       </h2>
 
-      <ol className="mt-4 flex list-none flex-col gap-3.5 p-0">
-        {steps.map((step, i) => (
-          <li key={step.title} className="flex gap-3">
-            <span
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold tabular-nums"
-              style={{ background: 'var(--grid-tint)', color: 'var(--grid-deep)' }}
-              aria-hidden="true"
-            >
-              {i + 1}
-            </span>
-            <span className="flex-1">
-              <span className="block text-[15px] font-semibold">{step.title}</span>
-              <span
-                className="mt-0.5 block text-[13.5px] leading-relaxed"
-                style={{ color: 'var(--ink-soft)' }}
-              >
-                {step.body}
-              </span>
-            </span>
-          </li>
+      {/* 지금 어디쯤인지 — 몇 걸음 남았는지 보여야 건너뛰지 않습니다 */}
+      <div className="mt-3 flex items-center gap-1.5" aria-hidden="true">
+        {steps.map((s, i) => (
+          <span
+            key={s.title}
+            className="h-1.5 rounded-full transition-all"
+            style={{
+              width: i === step ? 18 : 6,
+              background: i <= step ? 'var(--grid)' : 'var(--rule-strong)',
+            }}
+          />
         ))}
-      </ol>
+      </div>
 
-      <button className="btn btn-primary btn-lg mt-5" onClick={dismiss}>
-        {isParent ? '알겠어요, 시작할게요' : '알겠어요!'}
-      </button>
+      {/*
+        걸음마다 글 길이가 달라 카드 높이가 출렁이면 아래 내용이 튑니다.
+        가장 긴 걸음에 맞춰 자리를 잡아 둡니다.
+      */}
+      <div className="mt-4" style={{ minHeight: 104 }} role="status" aria-live="polite">
+        <p className="text-[15px] font-semibold" style={{ margin: 0 }}>
+          {current.title}
+        </p>
+        <p
+          className="mt-1 text-[13.5px] leading-relaxed"
+          style={{ color: 'var(--ink-soft)', margin: '4px 0 0' }}
+        >
+          {current.body}
+        </p>
+      </div>
+
+      <div className="mt-4 flex gap-2">
+        {step > 0 && (
+          <button className="btn btn-secondary" onClick={back}>
+            이전
+          </button>
+        )}
+        <button className="btn btn-primary flex-1 justify-center" onClick={forward}>
+          {last ? (isParent ? '알겠어요, 시작할게요' : '알겠어요!') : '다음'}
+        </button>
+      </div>
+
+      {/* 끝까지 다섯 번 누르게 강제하지 않습니다 */}
+      {!last && (
+        <button
+          className="btn btn-quiet mt-1 w-full justify-center text-xs"
+          onClick={dismiss}
+        >
+          건너뛰기
+        </button>
+      )}
+
       <p className="mt-2 text-center text-xs" style={{ color: 'var(--ink-faint)' }}>
         더보기에서 언제든 다시 볼 수 있어요
       </p>

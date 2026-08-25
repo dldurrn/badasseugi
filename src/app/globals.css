@@ -271,6 +271,39 @@
     color: var(--ink-faint);
   }
 
+  /* ---------- 비밀번호 보기 ----------
+     확인 칸과 함께 둡니다. 폰에서는 오타를 이쪽이 더 잘 막습니다. */
+  .field-with-eye {
+    position: relative;
+  }
+
+  .field-with-eye .field {
+    /* 글자가 버튼 아래로 들어가지 않게 자리를 비웁니다 */
+    padding-right: 62px;
+  }
+
+  .field-eye {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    background: transparent;
+  }
+
+  .field-eye:hover {
+    color: var(--ink);
+    background: var(--paper-sunk);
+  }
+
+  .field-eye:focus-visible {
+    outline: 2px solid var(--grid);
+    outline-offset: 1px;
+  }
+
   /* ---------- 원고지 (쓰기·미리보기) ----------
      채점 화면의 `.grid-cell`과 다른 물건입니다.
      저기는 낱낱의 칸을 떼어 견주는 자리고, 여기는 이어 붙은 격자 그 자체입니다.
