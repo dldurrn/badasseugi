@@ -12,7 +12,8 @@ import { readActiveProfile } from '@/lib/profile-server';
  * 진짜 할 일이 먼저 보여야 합니다.
  * 아직 넣은 게 없으면 빈 안내가 위에 오는데, 그게 곧 "여기에 넣으세요"라는 말이 됩니다.
  *
- * 연습 문제는 학년·학기 표시 없이 급수 1~20으로만 올라갑니다(난이도만 있는 목록).
+ * 연습 문제는 학년·학기 표시 없이 1~20단계로만 올라갑니다(난이도만 있는 목록).
+ * 학교 문제지가 「급」을 쓰기 때문에 내장 문제는 「단계」로 갈라 둡니다 — 아이가 헷갈리지 않게.
  * 만들기는 보호자 화면에만 보입니다(지침 9).
  */
 export default async function DictationPage() {
@@ -77,7 +78,7 @@ export default async function DictationPage() {
 
       <h2 className="section-title mb-2 mt-8">연습 문제</h2>
       <p className="mb-2.5 text-xs" style={{ color: 'var(--ink-faint)' }}>
-        급수가 올라갈수록 어려워져요. 낮은 급부터 차례로 해 보세요.
+        단계가 올라갈수록 어려워져요. 1단계부터 차례로 해 보세요.
       </p>
 
       <ul className="flex flex-col gap-2">

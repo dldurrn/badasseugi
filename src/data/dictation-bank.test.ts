@@ -22,13 +22,13 @@ describe('내장 세트 구조', () => {
     expect(isBuiltinSetId('b5e52697-7514-4f79-914c-cd415bd2dae3')).toBe(false);
   });
 
-  it('id가 급수와 맞다', () => {
+  it('id가 단계 번호와 맞다', () => {
     for (const set of DICTATION_BANK) {
       expect(set.id).toBe(`lv${set.level}`);
     }
   });
 
-  it('급수가 1부터 순서대로, 빠짐없이 올라간다', () => {
+  it('단계가 1부터 순서대로, 빠짐없이 올라간다', () => {
     const levels = DICTATION_BANK.map((s) => s.level);
     expect(levels).toEqual(Array.from({ length: levels.length }, (_, i) => i + 1));
   });
@@ -84,18 +84,18 @@ describe('문장 품질', () => {
     }
   });
 
-  it('1급은 받침이 없다 — 급수가 올라가며 어려워져야 한다', () => {
+  it('1단계는 받침이 없다 — 단계가 올라가며 어려워져야 한다', () => {
     const first = findBuiltinSet('lv1');
     for (const word of first!.sentences) {
       for (const ch of word) {
         const jamo = decompose(ch);
         if (!jamo) continue;
-        expect(jamo.jong, `1급의 "${word}"에 받침이 있습니다`).toBe('');
+        expect(jamo.jong, `1단계의 "${word}"에 받침이 있습니다`).toBe('');
       }
     }
   });
 
-  it('2급부터는 받침 있는 낱말이 섞여 있다', () => {
+  it('2단계부터는 받침 있는 낱말이 섞여 있다', () => {
     const second = findBuiltinSet('lv2');
     const hasBatchim = second!.sentences.some((word) =>
       [...word].some((ch) => decompose(ch)?.jong),
@@ -103,14 +103,14 @@ describe('문장 품질', () => {
     expect(hasBatchim).toBe(true);
   });
 
-  it('6급은 짧은 문장으로 마침표가 있다', () => {
+  it('6단계는 짧은 문장으로 마침표가 있다', () => {
     const sixth = findBuiltinSet('lv6');
     for (const sentence of sixth!.sentences) {
       expect(sentence.endsWith('.')).toBe(true);
     }
   });
 
-  it('10급은 문장부호가 다양하다 — 마침표만 있는 낮은 급과 달라야 한다', () => {
+  it('10단계는 문장부호가 다양하다 — 마침표만 있는 낮은 단계와 달라야 한다', () => {
     const tenth = findBuiltinSet('lv10');
     const marks = new Set(
       tenth!.sentences.map((s) => s[s.length - 1]).filter((ch) => '.!?'.includes(ch)),

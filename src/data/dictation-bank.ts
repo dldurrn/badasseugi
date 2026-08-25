@@ -3,11 +3,11 @@
  *
  * 부모가 문제를 넣기 전까지 아이가 할 게 아무것도 없던 빈칸을 메우는 자리입니다.
  *
- * 학년·학기 표시를 두지 않고 급수 1~로만 올라갑니다.
- * 실제 학교 받아쓰기 자료를 열어 보니 급수 진행 순서가 이랬습니다.
- *   1급 받침 없는 낱말 → 2급 받침 있는 낱말 → 3급 짧은 구 → 4급 감탄문·명령문
- *   → 5급 설명하는 구 → 6급 짧은 문장(감정 표현) → 7급 주어+의성의태어
- *   → 8급 수량 단위+비교문 → 9급 주어+목적어+동사(다형) → 10급 복합문·대화체
+ * 학년·학기 표시를 두지 않고 1단계부터 20단계로만 올라갑니다.
+ * 실제 학교 받아쓰기 자료를 열어 보니 난이도 진행 순서가 이랬습니다.
+ *   1단계 받침 없는 낱말 → 2단계 받침 있는 낱말 → 3단계 짧은 구 → 4단계 감탄문·명령문
+ *   → 5단계 설명하는 구 → 6단계 짧은 문장(감정 표현) → 7단계 주어+의성의태어
+ *   → 8단계 수량 단위+비교문 → 9단계 주어+목적어+동사(다형) → 10단계 복합문·대화체
  * 이 순서(난이도 곡선)만 그대로 따르고, 낱말과 문장은 전부 새로 씁니다.
  * 저작권이 있는 원문을 그대로 옮기지 않습니다.
  *
@@ -26,7 +26,7 @@ export interface BuiltinSet {
   id: string;
   level: number;
   name: string;
-  /** 이 급에서 무엇을 연습하는지 (보호자에게 보여 줍니다) */
+  /** 이 단계에서 무엇을 연습하는지 (보호자에게 보여 줍니다) */
   focus: string;
   sentences: string[];
 }
@@ -35,7 +35,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv1',
     level: 1,
-    name: '1급',
+    name: '1단계',
     focus: '받침 없는 낱말',
     sentences: [
       '포도', '두부', '여우', '오이', '다리', '거미', '나비', '그네', '파도', '미소',
@@ -44,7 +44,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv2',
     level: 2,
-    name: '2급',
+    name: '2단계',
     focus: '받침이 있는 낱말',
     sentences: [
       '안경', '인형', '자전거', '풍선', '냉장고', '손수건', '딱지', '목걸이', '물감', '창문',
@@ -53,7 +53,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv3',
     level: 3,
-    name: '3급',
+    name: '3단계',
     focus: '짧은 구',
     sentences: [
       '파란 하늘',
@@ -71,7 +71,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv4',
     level: 4,
-    name: '4급',
+    name: '4단계',
     focus: '감탄문과 명령문',
     sentences: [
       '앗, 뜨거워!',
@@ -89,7 +89,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv5',
     level: 5,
-    name: '5급',
+    name: '5단계',
     focus: '설명하는 구',
     sentences: [
       '아기 오리의 첫 나들이',
@@ -107,7 +107,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv6',
     level: 6,
-    name: '6급',
+    name: '6단계',
     focus: '짧은 문장 · 감정 표현',
     sentences: [
       '기뻐요.',
@@ -125,7 +125,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv7',
     level: 7,
-    name: '7급',
+    name: '7단계',
     focus: '주어와 의성어·의태어',
     sentences: [
       '시냇물이 졸졸',
@@ -143,7 +143,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv8',
     level: 8,
-    name: '8급',
+    name: '8단계',
     focus: '수량 단위와 비교하는 문장',
     sentences: [
       '사탕 한 봉지',
@@ -161,7 +161,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv9',
     level: 9,
-    name: '9급',
+    name: '9단계',
     focus: '주어와 목적어가 있는 문장',
     sentences: [
       '우유를 마시다.',
@@ -179,7 +179,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv10',
     level: 10,
-    name: '10급',
+    name: '10단계',
     focus: '이어지는 대화체 문장',
     sentences: [
       '어? 저게 뭐지?',
@@ -196,7 +196,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   },
 
   /* ---------------------------------------------------------------------
-   * 11~20급 — 다음 단계.
+   * 11~20단계 — 뒷부분.
    * 실제 자료의 2학년 1학기 파일을 열어 보니 작은·큰따옴표 쓰기가
    * 이 시기부터 들어가 있었습니다(자동화 환경이라 문항까지는 못 봤습니다).
    * 그 신호와 2학년 국어에서 흔히 다루는 요소(겹받침 확장, 연결어미,
@@ -205,7 +205,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv11',
     level: 11,
-    name: '11급',
+    name: '11단계',
     focus: '겹받침 낱말',
     sentences: [
       '넓다', '얇다', '앉다', '많다', '짧다', '밝다', '굵다', '얹다', '삶다', '젊다',
@@ -214,7 +214,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv12',
     level: 12,
-    name: '12급',
+    name: '12단계',
     focus: '큰따옴표로 나타낸 대화',
     sentences: [
       '"안녕!" 하고 인사했어요.',
@@ -232,7 +232,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv13',
     level: 13,
-    name: '13급',
+    name: '13단계',
     focus: '높임말 문장',
     sentences: [
       '안녕히 계세요.',
@@ -250,7 +250,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv14',
     level: 14,
-    name: '14급',
+    name: '14단계',
     focus: '이유를 나타내는 문장',
     sentences: [
       '배가 고파서 밥을 먹었어요.',
@@ -268,7 +268,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv15',
     level: 15,
-    name: '15급',
+    name: '15단계',
     focus: '두 가지를 잇는 문장',
     sentences: [
       '우유를 마시고, 빵도 먹어요.',
@@ -286,7 +286,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv16',
     level: 16,
-    name: '16급',
+    name: '16단계',
     focus: '다양한 의문문',
     sentences: [
       '이게 뭐예요?',
@@ -304,7 +304,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv17',
     level: 17,
-    name: '17급',
+    name: '17단계',
     focus: '권유하는 문장',
     sentences: [
       '같이 놀아요.',
@@ -322,7 +322,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv18',
     level: 18,
-    name: '18급',
+    name: '18단계',
     focus: '비슷한말과 반대말',
     sentences: [
       '크다와 작다는 반대말이에요.',
@@ -342,7 +342,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv19',
     level: 19,
-    name: '19급',
+    name: '19단계',
     focus: '흉내 내는 말이 있는 긴 문장',
     sentences: [
       '아기가 아장아장 걸어요.',
@@ -362,7 +362,7 @@ export const DICTATION_BANK: BuiltinSet[] = [
   {
     id: 'lv20',
     level: 20,
-    name: '20급',
+    name: '20단계',
     focus: '두 문장으로 된 짧은 이야기',
     sentences: [
       '오늘은 소풍을 갔어요. 정말 즐거웠어요.',
