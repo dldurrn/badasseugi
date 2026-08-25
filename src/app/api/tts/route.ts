@@ -29,6 +29,44 @@ interface Body {
   text?: unknown;
   rate?: unknown;
   voice?: unknown;
+  /** 어절 사이에 둘 쉼(ms). 0이면 이어서 읽습니다. */
+  gapMs?: unknown;
+}
+
+/**
+ * SSML 안에서 뜻을 갖는 글자를 막습니다.
+ *
+ * 특히 큰따옴표가 문제입니다. 12단계 문장이 전부 `"안녕!" 하고 인사했어요.` 꼴이라
+ * 그대로 넣으면 SSML이 깨지고 그 문장만 소리가 안 납니다.
+ */
+function escapeSsml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * 어절마다 쉬어 읽는 문장을 SSML로 만듭니다.
+ *
+ * 예전에는 낱말을 하나씩 따로 합성해 이어 붙였습니다.
+ * 그러면 TTS가 낱말 하나를 **완결된 문장으로** 읽습니다 —
+ * 「콧잔등에」를 마침표 찍듯 뚝 떨어뜨리고 다음 낱말도 그렇게 읽으니,
+ * 또박또박 들으려고 누른 것이 오히려 더 안 들렸습니다.
+ *
+ * 한 번에 보내면 문장 억양이 살아 있는 채로 사이만 벌어집니다.
+ * 요청도 어절 수만큼이 아니라 한 번이면 끝납니다.
+ */
+function buildChunkedSsml(text: string, gapMs: number): string {
+  const gap = `<break time="${Math.round(gapMs)}ms"/>`;
+  const body = text
+    .split(' ')
+    .filter(Boolean)
+    .map(escapeSsml)
+    .join(gap);
+  return `<speak>${body}</speak>`;
 }
 
 export async function POST(request: Request) {
@@ -59,6 +97,14 @@ export async function POST(request: Request) {
       ? body.voice
       : DEFAULT_VOICE;
 
+  // 0이면 이어서 읽고, 값이 있으면 어절 사이를 그만큼 벌립니다.
+  const rawGap = typeof body.gapMs === 'number' ? body.gapMs : 0;
+  const gapMs = Math.min(2000, Math.max(0, rawGap));
+  const ssml = gapMs > 0 ? buildChunkedSsml(text, gapMs) : null;
+
+  // 과금은 Google이 실제로 받는 글자 수 기준입니다. SSML은 태그까지 셉니다.
+  const billedChars = ssml ? ssml.length : text.length;
+
   /* 하루 사용량 확인 — 과금 단위가 글자 수라 글자 수로 셉니다 -------------- */
   const limit = Number(process.env.TTS_DAILY_LIMIT ?? 20000);
   const today = new Date().toISOString().slice(0, 10);
@@ -83,7 +129,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        input: { text },
+        input: ssml ? { ssml } : { text },
         voice: { languageCode: 'ko-KR', name: voice },
         audioConfig: { audioEncoding: 'MP3', speakingRate: rate },
       }),
@@ -107,7 +153,7 @@ export async function POST(request: Request) {
   await supabase
     .from('tts_usage')
     .upsert(
-      { family_id: user.id, used_on: today, chars: usedToday + text.length },
+      { family_id: user.id, used_on: today, chars: usedToday + billedChars },
       { onConflict: 'family_id,used_on' },
     );
 

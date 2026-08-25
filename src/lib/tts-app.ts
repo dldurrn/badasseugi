@@ -102,9 +102,11 @@ async function fetchAudio(
   text: string,
   rate: number,
   signal: AbortSignal,
+  gapMs = 0,
 ): Promise<FetchResult> {
   const voice = readVoice();
-  const key = `${voice ?? ''}|${rate}|${text}`;
+  // 쉼도 열쇠에 넣습니다. 이어서 읽은 소리와 또박또박 읽은 소리는 다른 소리입니다.
+  const key = `${voice ?? ''}|${rate}|${gapMs}|${text}`;
 
   const hit = cache.get(key);
   if (hit) return { kind: 'ok', url: hit };
@@ -113,7 +115,7 @@ async function fetchAudio(
     const response = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, rate, voice }),
+      body: JSON.stringify({ text, rate, voice, gapMs }),
       signal,
     });
 
@@ -176,5 +178,37 @@ export const appSpeech: SpeechProvider = {
     }
 
     await browserSpeech.speak(text, rate, signal);
+  },
+
+  /**
+   * 어절 사이를 벌리되 한 문장으로 읽습니다.
+   *
+   * 서버가 SSML로 쉼을 넣어 한 번에 합성해 줍니다.
+   * 낱말을 따로 합성하던 예전 방식보다 잘 들리고, 요청도 어절 수만큼이 아니라 한 번입니다.
+   *
+   * 서버가 안 되면 브라우저 음성으로 넘어가는데, 거기서는 쉼을 지정할 수 없어
+   * 어쩔 수 없이 낱말을 하나씩 읽습니다.
+   */
+  async speakWithPauses(text, rate, gapMs, signal) {
+    if (signal.aborted) return;
+
+    if (serverUsable !== false) {
+      const result = await fetchAudio(text, rate, signal, gapMs);
+
+      if (result.kind === 'ok') {
+        serverUsable = true;
+        await playUrl(result.url, signal);
+        return;
+      }
+      if (result.kind === 'disabled') serverUsable = false;
+      if (signal.aborted) return;
+    }
+
+    for (const word of text.split(' ').filter(Boolean)) {
+      if (signal.aborted) return;
+      await browserSpeech.speak(word, rate, signal);
+      if (signal.aborted) return;
+      await new Promise((r) => window.setTimeout(r, gapMs));
+    }
   },
 };

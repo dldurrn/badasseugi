@@ -39,6 +39,19 @@ export interface SpeechProvider {
   speak(text: string, rate: number, signal: AbortSignal): Promise<void>;
   /** 이 기기에서 쓸 수 있는지 */
   isAvailable(): boolean;
+  /**
+   * 어절 사이를 벌리되 **한 문장으로** 읽습니다.
+   *
+   * 없어도 됩니다 — 그러면 컨트롤러가 낱말을 하나씩 따로 읽습니다.
+   * 다만 낱말 하나만 던지면 TTS가 그걸 완결된 문장으로 읽어 뚝뚝 끊깁니다.
+   * 이걸 구현할 수 있는 공급자는 문장 억양을 살린 채로 사이만 벌릴 수 있습니다.
+   */
+  speakWithPauses?(
+    text: string,
+    rate: number,
+    gapMs: number,
+    signal: AbortSignal,
+  ): Promise<void>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -155,6 +168,15 @@ export class SpeechController {
     const speakWhole = () => this.provider.speak(sentence, rate, signal);
 
     const speakChunks = async () => {
+      // 한 문장으로 읽을 수 있으면 그쪽이 훨씬 잘 들립니다.
+      // 낱말을 따로 합성하면 TTS가 낱말마다 문장을 끝내듯 읽어서,
+      // 또박또박 들으려고 누른 것이 오히려 더 안 들립니다.
+      if (this.provider.speakWithPauses) {
+        await this.provider.speakWithPauses(sentence, rate, GAP_BETWEEN_WORDS, signal);
+        return;
+      }
+
+      // 브라우저 내장 음성은 쉼을 지정할 수 없어 낱말을 하나씩 읽습니다.
       for (const word of sentence.split(' ')) {
         if (signal.aborted) return;
         await this.provider.speak(word, rate, signal);
