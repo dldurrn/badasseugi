@@ -260,3 +260,59 @@ describe('scoreOf: 점수 계산', () => {
     expect(scoreOf(rs)).toBe(92);
   });
 });
+
+/**
+ * 같은 글자가 이어질 때 어느 쪽을 짚는가.
+ *
+ * 편집거리는 「접다..」의 두 점 중 어느 것이 군더더기인지 가리지 않습니다.
+ * 값이 같아서 아무 쪽이나 골라도 되는데, 아이에게는 전혀 같지 않습니다.
+ * 앞엣것을 짚으면 바르게 찍은 점이 틀렸다고 나오고 덧붙인 점은 맞았다고 나옵니다.
+ * 사람은 언제나 "뒤에 하나 더 붙였다"고 읽습니다.
+ */
+describe('같은 글자가 이어질 때 — 뒤쪽을 짚는다', () => {
+  /** 몇 번째 칸이 잘못이라고 표시됐는지 */
+  const gapAt = (answer: string, input: string) =>
+    grade(answer, input).columns.findIndex(
+      (c) => c.kind === 'extra' || c.kind === 'missing',
+    );
+
+  it('마침표를 두 번 찍으면 뒤엣것을 짚는다', () => {
+    const g = grade('종이를 접다.', '종이를 접다..');
+    expect(gapAt('종이를 접다.', '종이를 접다..')).toBe(7);
+    expect(g.columns[6]).toEqual({ kind: 'same', input: '.', answer: '.' });
+    expect(g.columns[7]).toEqual({ kind: 'extra', input: '.' });
+  });
+
+  it('같은 글자를 하나 더 쓰면 뒤엣것을 짚는다', () => {
+    expect(gapAt('사과', '사사과')).toBe(1);
+    expect(gapAt('가다', '가다다')).toBe(2);
+    expect(gapAt('아이가', '아아이가')).toBe(1);
+  });
+
+  it('흉내말을 한 번 더 써도 뒤엣것을 짚는다', () => {
+    expect(gapAt('나비가 훨훨 날아요.', '나비가 훨훨훨 날아요.')).toBe(6);
+  });
+
+  it('빠뜨린 경우도 뒤쪽을 짚는다', () => {
+    expect(gapAt('종이를 접다..', '종이를 접다.')).toBe(7);
+    expect(gapAt('사사과', '사과')).toBe(1);
+    expect(gapAt('훨훨', '훨')).toBe(1);
+  });
+
+  it('다른 글자는 자리를 옮기지 않는다', () => {
+    // 「나」는 하나뿐이라 옮길 곳이 없습니다.
+    expect(gapAt('가나다', '가다')).toBe(1);
+  });
+
+  it('무엇이 틀렸는지는 그대로다', () => {
+    // 자리만 옮길 뿐, 점수도 오류 유형도 바뀌지 않아야 합니다.
+    const g = grade('종이를 접다.', '종이를 접다..');
+    expect(g.correct).toBe(false);
+    expect(g.errorTypes).toEqual(['punct']);
+    expect(g.columns.filter((c) => c.kind === 'extra')).toHaveLength(1);
+  });
+
+  it('바르게 쓴 답은 그대로 정답이다', () => {
+    expect(grade('종이를 접다.', '종이를 접다.').correct).toBe(true);
+  });
+});

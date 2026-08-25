@@ -132,6 +132,45 @@ export function align(answer: string, input: string): AlignOp[] {
   return ops.reverse();
 }
 
+/**
+ * 같은 글자가 이어질 때, 더 쓴 글자·빠뜨린 글자 표시를 뒤쪽으로 밉니다.
+ *
+ * 편집거리는 「종이를 접다..」에서 두 점 중 **어느 것**이 군더더기인지 가리지 않습니다.
+ * 둘 다 값이 같아서, 역추적이 앞엣것을 골라 버립니다.
+ * 그러면 화면에는 첫 번째 점이 틀렸다고 뜹니다 —
+ * 아이 눈에는 바르게 찍은 점이 틀렸다고 나오고, 덧붙인 점은 맞았다고 나옵니다.
+ * 채점을 못 믿게 되는 순간입니다.
+ *
+ * 사람은 언제나 **뒤에 하나 더 붙였다**고 읽습니다. 그 자리에 표시를 옮깁니다.
+ *
+ * 옮기는 것은 **같은 글자끼리뿐**이라 무엇이 틀렸는지는 하나도 바뀌지 않습니다.
+ * 점수도, 오류 유형도, 오답노트도 그대로입니다. 짚는 자리만 옮깁니다.
+ */
+function shiftGapsRight(columns: Column[]): Column[] {
+  const out = [...columns];
+
+  for (let i = 0; i < out.length; i += 1) {
+    const gap = out[i];
+    if (gap.kind !== 'extra' && gap.kind !== 'missing') continue;
+
+    let at = i;
+    while (at + 1 < out.length) {
+      const next = out[at + 1];
+      if (next.kind !== 'same') break;
+
+      const sameLetter =
+        gap.kind === 'extra' ? gap.input === next.input : gap.answer === next.answer;
+      if (!sameLetter) break;
+
+      out[at] = next;
+      out[at + 1] = gap;
+      at += 1;
+    }
+  }
+
+  return out;
+}
+
 /** 대체(sub) 한 쌍이 어떤 유형의 오류인지 판정합니다. */
 function classifySubstitution(answerCh: string, inputCh: string): ErrorType {
   const da = decompose(answerCh);
@@ -239,7 +278,15 @@ export function grade(rawAnswer: string, rawInput: string): GradeResult {
 
   const errorTypes = TYPE_ORDER.filter((t) => types.has(t));
 
-  return { correct: false, answer, input, errorTypes, columns, batchimDetails };
+  return {
+    correct: false,
+    answer,
+    input,
+    errorTypes,
+    // 무엇이 틀렸는지는 위에서 다 정해졌습니다. 여기서는 짚는 자리만 다듬습니다.
+    columns: shiftGapsRight(columns),
+    batchimDetails,
+  };
 }
 
 /**
