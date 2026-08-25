@@ -12,6 +12,7 @@ import {
   toText,
   toWritingCells,
   writingCursor,
+  writingToText,
 } from './wongoji';
 
 /**
@@ -238,6 +239,52 @@ describe('누른 칸 → 글자 자리', () => {
     const mixed = '가🐣나';
     expect(cellToTextOffset(mixed, 2)).toBe(3);
     expect(mixed.slice(cellToTextOffset(mixed, 2))).toBe('나');
+  });
+});
+
+/**
+ * 원고지에 쓴 것을 채점에 넘기기까지.
+ *
+ * 앞서 이 변환을 만들어 두고도 **화면에 꽂지 않아서**,
+ * 원고지 규칙대로 쉼표 뒤를 붙여 쓴 아이가 띄어쓰기를 틀렸다는 채점을 받았습니다.
+ * 규칙을 지켰는데 벌을 받은 셈입니다.
+ */
+describe('원고지에 쓴 것 → 채점할 문장', () => {
+  it('쉼표 뒤를 붙여 써도 공백이 되살아난다', () => {
+    expect(writingToText('우유를 마시고,빵도 먹어요.')).toBe('우유를 마시고, 빵도 먹어요.');
+  });
+
+  it('쉼표 뒤를 띄워 써도 같은 문장이 된다', () => {
+    // 원고지 규칙을 몰라도 채점이 달라지지 않아야 합니다.
+    expect(writingToText('우유를 마시고, 빵도 먹어요.')).toBe('우유를 마시고, 빵도 먹어요.');
+  });
+
+  it('마침표 뒤도 마찬가지다', () => {
+    expect(writingToText('갔어요.정말 즐거웠어요.')).toBe('갔어요. 정말 즐거웠어요.');
+  });
+
+  it('실수로 두 번 띄어도 한 칸으로 다듬는다', () => {
+    expect(writingToText('가  나')).toBe('가 나');
+  });
+
+  it('끝에 남은 빈 칸은 버린다', () => {
+    expect(writingToText('가 나  ')).toBe('가 나');
+  });
+
+  it('내장 문장을 원고지 규칙대로 쓰면 모두 정답이 된다', () => {
+    const broken: string[] = [];
+
+    for (const set of DICTATION_BANK) {
+      for (const sentence of set.sentences) {
+        // 아이가 원고지 규칙대로 쓴 모습 = 칸을 그대로 이어 붙인 것
+        const asWritten = toCells(sentence).map((c) => c || ' ').join('');
+        if (writingToText(asWritten) !== normalize(sentence)) {
+          broken.push(`${sentence} → ${writingToText(asWritten)}`);
+        }
+      }
+    }
+
+    expect(broken).toEqual([]);
   });
 });
 

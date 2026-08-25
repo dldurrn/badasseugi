@@ -12,6 +12,7 @@ import {
 import { sfx } from '@/lib/sfx';
 import { appSpeech, RATES, readRate, writeRate } from '@/lib/tts-app';
 import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
+import { writingToText } from '@/lib/wongoji';
 import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
 import { GradeSheet } from './GradeSheet';
 import { WongojiInput } from './WongojiInput';
@@ -131,7 +132,17 @@ export function DictationSession({
   const askConfirm = () => {
     if (phase !== 'writing' || !typed.trim()) return;
     speech.stop();
-    setPending(typed);
+    /*
+      원고지에 썼으면 여기서 문장으로 바꿔 둡니다.
+
+      격자는 보여 주는 방식일 뿐이고 입력칸에는 친 글자가 그대로 담깁니다.
+      아이가 원고지 규칙대로 쉼표 뒤를 붙여 쓰면 "마시고,빵도"가 되는데,
+      그대로 채점에 넘기면 띄어쓰기를 틀렸다고 나옵니다 — 규칙을 지켰는데 벌을 받는 셈입니다.
+
+      최종 확인 화면에도 이 값을 보여 줍니다.
+      눈에 보이는 문장과 채점될 문장이 다르면 확인 단계가 뜻을 잃습니다.
+    */
+    setPending(writeMode === 'wongoji' ? writingToText(typed) : typed);
     setPhase('confirming');
   };
 

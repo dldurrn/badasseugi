@@ -168,6 +168,23 @@ export function writingCursor(cellCount: number, composing: boolean): number {
   return cellCount;
 }
 
+/**
+ * 원고지에 쓴 것을 채점에 넘길 문장으로 바꿉니다.
+ *
+ * **원고지 모드에서 제출할 때 반드시 거쳐야 하는 자리입니다.**
+ * 이걸 건너뛰면 아이가 원고지 규칙대로 쉼표 뒤를 붙여 썼을 때
+ * 띄어쓰기를 틀렸다는 채점을 받습니다 — 규칙을 지켰는데 벌을 받는 셈입니다.
+ *
+ *   아이가 친 것   "우유를 마시고,빵도 먹어요."
+ *   채점에 넘길 것 "우유를 마시고, 빵도 먹어요."
+ *
+ * 「그냥 쓰기」 모드에서는 부르면 안 됩니다.
+ * 한 줄로 이어 쓸 때는 쉼표 뒤를 띄우는 것이 맞춤법이라, 붙여 썼으면 그건 진짜 오류입니다.
+ */
+export function writingToText(value: string): string {
+  return toText(toWritingCells(value));
+}
+
 /** 격자를 채우고 남는 자리는 빈 칸으로 둡니다. 늘 같은 크기로 보이게 하려는 것입니다. */
 export function padToGrid(
   cells: string[],

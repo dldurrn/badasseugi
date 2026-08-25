@@ -10,6 +10,7 @@ import { initSfx, sfx } from '@/lib/sfx';
 import { SpeechController } from '@/lib/tts';
 import { appSpeech, readRate } from '@/lib/tts-app';
 import type { Module } from '@/lib/types';
+import { writingToText } from '@/lib/wongoji';
 import { readWriteMode, type WriteMode } from '@/lib/write-mode';
 import { WongojiInput } from './WongojiInput';
 
@@ -70,7 +71,19 @@ export function InlineNotePractice({
     return () => speech.stop();
   }, [speech]);
 
-  const answer = module === 'spelling' ? (choice ?? '') : typed;
+  /*
+    받아쓰기는 채점에 넘길 문장을 여기서 만듭니다.
+
+    원고지에 썼으면 쉼표 뒤를 붙여 쓴 것을 문장으로 되돌려 놓아야 합니다.
+    그러지 않으면 규칙대로 쓴 아이가 띄어쓰기를 틀렸다는 채점을 받습니다.
+    확인 화면에 보여 주는 값도 이것이라, 눈에 보이는 문장이 곧 채점될 문장입니다.
+  */
+  const answer =
+    module === 'spelling'
+      ? (choice ?? '')
+      : writeMode === 'wongoji'
+        ? writingToText(typed)
+        : typed;
   const canConfirm = answer.trim().length > 0;
 
   const play = async (style: 'flow' | 'chunked') => {
@@ -95,7 +108,8 @@ export function InlineNotePractice({
       isCorrect = choice === question.answer;
       errorTypes = [question.tag];
     } else {
-      const graded = grade(content, typed);
+      // 확인 화면에 보여 준 그 문장을 그대로 채점합니다.
+      const graded = grade(content, answer);
       setResult(graded);
       isCorrect = graded.correct;
       errorTypes = graded.errorTypes;
