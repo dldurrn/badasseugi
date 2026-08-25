@@ -94,14 +94,30 @@ export function DictationSession({
     if (phase === 'writing') inputRef.current?.focus();
   }, [index, phase]);
 
+  /**
+   * 입력칸으로 돌아옵니다.
+   *
+   * 버튼을 누르면 포커스가 그 버튼으로 옮겨 가는데, 아무도 되돌려 주지 않으면
+   * 폰에서는 키보드가 내려가고 PC에서는 키를 눌러도 글자가 안 들어갑니다.
+   * 원고지 모드는 입력칸이 투명해서 아무 표시도 없이 먹통이 된 것처럼 보입니다.
+   *
+   * `focus()`는 커서 자리를 건드리지 않으므로 쓰던 자리에서 이어 씁니다.
+   * 부품이 갈릴 때(쓰기 모드 전환)도 쓸 수 있게 다음 차례로 미룹니다.
+   */
+  const refocus = useCallback(() => {
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  }, []);
+
   const play = useCallback(
     async (style: ReadingStyle) => {
       if (!current) return;
       setSpeaking(style);
       await speech.play(current.sentence, rate, style);
       setSpeaking(null);
+      // 다 듣고 나서 돌려줍니다. 듣는 도중에 키보드가 올라오면 버튼을 가립니다.
+      refocus();
     },
-    [current, rate, speech],
+    [current, rate, speech, refocus],
   );
 
   /** 나가기 — 진행 중이면 기록이 저장되지 않음을 알립니다. */
@@ -254,6 +270,7 @@ export function DictationSession({
                 setRate(r);
                 // 다음 세션에서도 이어지도록 기억합니다.
                 writeRate(r);
+                refocus();
               }}
               aria-pressed={rate === r}
               className="rounded-full px-3 py-1.5 text-xs transition-colors"
@@ -291,6 +308,8 @@ export function DictationSession({
                 const next = writeMode === 'wongoji' ? 'plain' : 'wongoji';
                 setWriteMode(next);
                 saveWriteMode(next);
+                // 입력칸 부품이 통째로 갈리므로, 새로 그려진 뒤에 돌려줍니다.
+                refocus();
               }}
             >
               {writeMode === 'wongoji' ? '그냥 쓰기' : '원고지에 쓰기'}

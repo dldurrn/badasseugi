@@ -3,6 +3,7 @@ import { DICTATION_BANK } from '@/data/dictation-bank';
 import { normalize } from './hangul';
 import {
   EMPTY,
+  cellToTextOffset,
   WONGOJI_COLS,
   WONGOJI_MIN_ROWS,
   growingGrid,
@@ -197,6 +198,46 @@ describe('쓰는 중의 칸 — 누른 대로 남는다', () => {
 
   it('아무것도 안 쓰면 칸도 없다', () => {
     expect(toWritingCells('')).toEqual([]);
+  });
+});
+
+describe('누른 칸 → 글자 자리', () => {
+  const text = '눈처럼 하얗고 예쁜 집이';
+
+  it('칸 번호와 글자 번호가 그대로 맞는다', () => {
+    // 예전에는 격자를 눌러도 입력칸이 제 나름대로 커서를 잡아
+    // 둘째 줄을 눌렀는데 첫째 줄 한가운데로 갔습니다.
+    expect(cellToTextOffset(text, 0)).toBe(0);
+    expect(cellToTextOffset(text, 3)).toBe(3);
+    expect(cellToTextOffset(text, 7)).toBe(7);
+    expect(cellToTextOffset(text, 11)).toBe(11);
+  });
+
+  it('누른 칸의 글자가 그 자리에 있다', () => {
+    for (let i = 0; i < Array.from(text).length; i += 1) {
+      expect(text[cellToTextOffset(text, i)]).toBe(Array.from(text)[i]);
+    }
+  });
+
+  it('글자 끝을 넘겨 누르면 끝으로 붙는다', () => {
+    // 빈 칸을 눌렀다고 공백을 채우면 그 공백이 그대로 답이 되어 채점이 틀어집니다.
+    expect(cellToTextOffset(text, 40)).toBe(text.length);
+    expect(cellToTextOffset('가나', 9)).toBe(2);
+  });
+
+  it('아무것도 안 쓴 격자를 눌러도 0', () => {
+    expect(cellToTextOffset('', 7)).toBe(0);
+  });
+
+  it('음수가 들어와도 첫 칸으로 본다', () => {
+    expect(cellToTextOffset(text, -3)).toBe(0);
+  });
+
+  it('두 자리를 차지하는 글자가 섞여도 어긋나지 않는다', () => {
+    // 이모지는 UTF-16으로 두 자리입니다. 칸 번호를 그대로 쓰면 어긋납니다.
+    const mixed = '가🐣나';
+    expect(cellToTextOffset(mixed, 2)).toBe(3);
+    expect(mixed.slice(cellToTextOffset(mixed, 2))).toBe('나');
   });
 });
 

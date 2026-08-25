@@ -32,8 +32,20 @@ export async function GET(request: Request) {
   const failure = (reason: string) =>
     NextResponse.redirect(new URL(`/login?error=${reason}`, url.origin));
 
-  // 공급자가 거절한 경우 (사용자가 카카오 동의 화면에서 취소한 경우 포함)
-  if (url.searchParams.get('error')) return failure('cancelled');
+  /*
+    거절당한 경우 — 원인을 갈라 줍니다.
+
+    예전에는 무엇이든 '취소'로 뭉갰습니다. 그래서 메일 링크가 만료됐을 때도
+    "로그인을 취소했어요"가 떴습니다. 취소한 적이 없는 사람에게 그렇게 말하면
+    무엇을 해야 할지 알 수가 없습니다.
+
+    `access_denied`는 카카오 동의 화면에서 취소했을 때도 오므로 이것만으로는 못 가릅니다.
+    만료는 `error_code`가 `otp_expired`로 따로 옵니다.
+  */
+  const providerError = url.searchParams.get('error');
+  const errorCode = url.searchParams.get('error_code');
+  if (errorCode === 'otp_expired') return failure('expired');
+  if (providerError) return failure('cancelled');
 
   const supabase = await createClient();
 

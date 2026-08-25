@@ -78,6 +78,8 @@ export function InlineNotePractice({
     // 설정과 세션 화면에서 정한 속도를 그대로 씁니다.
     await speech.play(content, readRate(), style);
     setSpeaking(false);
+    // 듣고 나면 쓰던 자리로 돌려줍니다. 안 그러면 키보드가 내려간 채로 남습니다.
+    window.setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const submit = async () => {

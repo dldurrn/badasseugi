@@ -141,6 +141,22 @@ export function toWritingCells(text: string): string[] {
 }
 
 /**
+ * 누른 칸이 글자 몇 번째 자리인지.
+ *
+ * `toWritingCells`가 글자 하나에 칸 하나를 그대로 내주므로 번호는 같습니다.
+ * 다만 입력칸이 다루는 위치는 UTF-16 기준이라, 이모지처럼 두 자리를 차지하는 글자가
+ * 섞이면 어긋납니다. 앞부분을 실제로 이어 붙여 길이를 재는 편이 안전합니다.
+ *
+ * 글자 끝을 넘겨 누르면 끝으로 보냅니다.
+ * 빈 칸을 눌렀다고 공백을 채워 넣으면 그 공백이 그대로 답이 되어 채점이 틀어집니다.
+ */
+export function cellToTextOffset(value: string, cellIndex: number): number {
+  const chars = Array.from(value ?? '');
+  const clamped = Math.min(Math.max(cellIndex, 0), chars.length);
+  return chars.slice(0, clamped).join('').length;
+}
+
+/**
  * 지금 쓰고 있는 칸이 어디인지.
  *
  * 조합 중이면 **마지막 글자가 놓인 칸**입니다.

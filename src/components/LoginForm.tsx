@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 /**
@@ -55,6 +55,29 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
   );
   const [busy, setBusy] = useState(false);
 
+  /*
+    `#` 뒤에 붙은 오류를 읽습니다.
+
+    브라우저는 `#` 뒤를 서버로 보내지 않습니다. 그래서 서버가 만든 안내는
+    실제 원인을 모른 채 뭉뚱그린 것일 수 있습니다.
+    여기서 진짜 원인을 읽어 덮어쓰고, 주소창도 정리합니다.
+  */
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash.includes('error')) return;
+
+    const params = new URLSearchParams(hash.slice(1));
+    const code = params.get('error_code');
+    if (code === 'otp_expired') {
+      setNotice({ kind: 'error', text: CALLBACK_ERRORS.expired });
+    } else if (params.get('error')) {
+      setNotice({ kind: 'error', text: CALLBACK_ERRORS.cancelled });
+    }
+
+    // 새로고침해도 같은 오류가 다시 뜨지 않게 지웁니다.
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+
   const switchMode = (next: Mode) => {
     setMode(next);
     setNotice(null);
@@ -73,7 +96,8 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      // 처음 보낸 메일과 같은 곳으로 보내야 합니다. 다르면 다시 보낸 것만 앱으로 들어갑니다.
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirmed` },
     });
     setNotice(
       error
@@ -120,7 +144,9 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        // 앱으로 들여보내지 않고 "가입이 끝났어요" 한 장만 보여 줍니다.
+        // 메일은 대개 다른 기기에서 열기 때문에, 거기서 로그인까지 시키려 하면 실패합니다.
+        options: { emailRedirectTo: `${window.location.origin}/auth/confirmed` },
       });
       if (error) {
         setNotice({
