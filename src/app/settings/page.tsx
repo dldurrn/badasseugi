@@ -46,15 +46,21 @@ export default async function SettingsPage() {
         <SoundToggle />
       </div>
 
+      {/*
+        속도와 쓰기 방법은 아이 화면에도 둡니다.
+        듣다가 느리게, 쓰다가 그냥 쓰기로 — 아이가 그 자리에서 바꿔야 하는 것들입니다.
+        목소리는 다릅니다. 부모가 한 번 정해 주면 되는 것이고,
+        미리듣기가 글자 수로 과금되어 하루 한도를 아이 몫에서 깎습니다.
+      */}
       <RateSettings />
-
-      {/* 음성 서비스가 설정되어 있을 때만 나타납니다 */}
-      <VoiceSettings />
 
       <WriteModeSettings />
 
       {isParent ? (
         <>
+          {/* 음성 서비스가 설정되어 있을 때만 나타납니다 */}
+          <VoiceSettings />
+
           <h2 className="section-title mb-2">자녀 프로필</h2>
           <ul className="mb-3 flex flex-col gap-2">
             {profiles.map((profile) => (
