@@ -1,23 +1,31 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { SpeechController } from '@/lib/tts';
+import { DEFAULT_VOICE, SpeechController } from '@/lib/tts';
 import { appSpeech, readRate, readVoice, writeVoice } from '@/lib/tts-app';
 
 /**
  * 목소리 고르기.
  *
- * 쓸 수 있는 한국어 목소리가 41개입니다. 쭉 늘어놓으면 고를 수가 없어서 묶어 둡니다.
+ * 쓸 수 있는 한국어 목소리가 41개입니다. 그중 **넷만 펼쳐 두고** 나머지는 접습니다.
  *
- * 묶는 기준을 '성별 + 계열'로 잡은 이유
- * 실제로 재 보니 계열에 따라 성격이 뚜렷하게 갈렸습니다.
+ * 왜 넷인가
+ * 계열에 따라 성격이 뚜렷하게 갈립니다.
  * - 고전 계열(Neural2/Wavenet/Standard)은 같은 문장을 몇 번을 불러도 **똑같이** 읽습니다.
  * - Chirp3 계열은 생성형이라 부를 때마다 길이와 억양이 조금씩 **달라집니다**.
- * 받아쓰기에서는 "다시 듣기"가 매번 같아야 해서, 이 차이를 화면에 적어 둡니다.
  *
- * 또 하나: Standard-A / Wavenet-A / Neural2-A 는 **같은 성우**이고 합성 품질만 다릅니다
- * (글자당 발화 시간이 정확히 같았습니다). 그래서 글자마다 가장 좋은 등급 하나만 앞에 세우고
- * 나머지는 맨 아래로 접어 둡니다. 들어 봐야 할 목소리가 41개에서 33개로 줄어듭니다.
+ * 받아쓰기는 "다시 듣기"가 매번 같아야 아이가 제 답을 견줄 수 있습니다.
+ * 그래서 고전 계열만 권하는데, 그게 넷입니다(여자 둘·남자 둘).
+ *
+ * 예전에는 서른셋을 늘어놓았습니다. 그중 스물아홉이 우리가 권하지 않는 최신 계열이었고,
+ * 화면에 경고까지 붙여 두었습니다 — **권하지 않는 것이 목록의 아홉 할**이었던 셈입니다.
+ * 지우지는 않습니다. 아이가 좋아하는 목소리가 있을 수 있고, 연습 모드라면 매번 달라도 됩니다.
+ *
+ * Standard-A / Wavenet-A / Neural2-A 는 **같은 성우**이고 합성 품질만 다릅니다
+ * (글자당 발화 시간이 정확히 같았습니다). 글자마다 가장 좋은 등급 하나만 세우고 나머지는 접습니다.
+ *
+ * 미리듣기는 글자 수로 과금되고 하루 한도(2만 자)를 아이와 나눠 씁니다.
+ * 서른셋을 다 들어 보면 그날 아이가 쓸 몫이 줄어듭니다 — 이것도 접는 이유입니다.
  *
  * 목록 자체는 코드에 적지 않고 서버에 물어봅니다. Google이 목소리를 계속 바꾸기 때문입니다.
  */
@@ -109,6 +117,29 @@ interface Group {
   folded?: boolean;
 }
 
+/**
+ * 목소리 이름을 사람이 읽을 수 있게 바꿉니다.
+ *
+ * `ko-KR-Neural2-A`는 아무것도 알려 주지 않습니다.
+ * 성별과 순번으로 부르면 부모가 넷을 다 들어 보고 고를 수 있습니다.
+ * 낮은 품질 묶음도 같은 번호를 쓰므로, 같은 번호면 같은 성우입니다.
+ */
+function labelByLetter(voices: VoiceOption[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [pick, word] of [
+    [(v: VoiceOption) => v.gender === 'FEMALE', '여자'],
+    [(v: VoiceOption) => v.gender === 'MALE', '남자'],
+  ] as const) {
+    voices
+      .filter(pick)
+      .map((v) => v.name.match(CLASSIC)?.[2] ?? '')
+      .filter(Boolean)
+      .sort()
+      .forEach((letter, i) => map.set(letter, `또박또박 ${word} ${i + 1}`));
+  }
+  return map;
+}
+
 function buildGroups(voices: VoiceOption[]): Group[] {
   // 글자(A/B/C/D)마다 가장 좋은 등급 하나만 남깁니다.
   // Neural2에 D가 없으므로 Wavenet-D가 D의 대표가 되는 식입니다.
@@ -130,18 +161,9 @@ function buildGroups(voices: VoiceOption[]): Group[] {
   const steady = voices.filter((v) => isClassic(v) && bestNames.has(v.name));
   const duplicates = voices.filter((v) => isClassic(v) && !bestNames.has(v.name));
 
-  /**
-   * 고전 계열은 성격이 공개돼 있지 않아 순번으로만 부릅니다.
-   * 이름 끝 글자가 성우를 뜻하므로 A=1, B=2로 옮기면
-   * 아래 '낮은 품질' 묶음의 번호와도 맞아떨어집니다 — 같은 번호면 같은 성우입니다.
-   */
-  const classicLabel = (name: string): string => {
-    const letter = name.match(CLASSIC)?.[2] ?? 'A';
-    return `고전 목소리 ${letter.charCodeAt(0) - 64}`;
-  };
-
-  const steadyRows = (pick: (v: VoiceOption) => boolean): VoiceRow[] =>
-    steady.filter(pick).map((v) => ({ name: v.name, label: classicLabel(v.name) }));
+  const nameOf = labelByLetter(steady);
+  const classicLabel = (name: string): string =>
+    nameOf.get(name.match(CLASSIC)?.[2] ?? '') ?? name.replace('ko-KR-', '');
 
   /** Chirp3는 별 이름 대신 Google이 공개한 성격으로 부릅니다. */
   const chirpRows = (pick: (v: VoiceOption) => boolean): VoiceRow[] =>
@@ -155,33 +177,52 @@ function buildGroups(voices: VoiceOption[]): Group[] {
         }),
     );
 
+  /*
+    권하는 넷만 펼쳐 둡니다.
+
+    예전에는 서른세 개를 늘어놓았는데, 그중 스물아홉이 최신 계열이었습니다.
+    최신 계열은 부를 때마다 조금씩 다르게 읽어서 **받아쓰기에는 맞지 않습니다** —
+    아이가 "다시 듣기"를 눌렀을 때 아까와 다른 소리가 나면 제 답을 견줄 수가 없습니다.
+    우리가 권하지 않는 것이 목록의 아홉 할을 차지하고 있었던 셈입니다.
+
+    지우지는 않습니다. 아이가 특정 목소리를 좋아할 수 있고,
+    연습 모드라면 매번 달라도 크게 문제되지 않습니다.
+
+    미리듣기가 글자 수로 과금되고 하루 한도(2만 자)를 아이와 나눠 쓴다는 점도 있습니다.
+    서른세 개를 다 들어 보면 그날 아이가 쓸 몫이 줄어듭니다.
+  */
+  const steadyRows = [...steady]
+    .map((v) => ({ name: v.name, label: classicLabel(v.name) }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+
+  // 기본 목소리를 맨 앞에 둡니다. 고르지 않았을 때 실제로 나는 소리입니다.
+  const at = steadyRows.findIndex((r) => r.name === DEFAULT_VOICE);
+  if (at > 0) steadyRows.unshift(...steadyRows.splice(at, 1));
+
   return [
     {
-      key: 'steady-f',
-      title: '또박또박 · 여자',
+      key: 'steady',
+      title: '받아쓰기에 알맞은 목소리',
       hint: '몇 번을 들어도 똑같이 읽어요',
-      rows: steadyRows(female),
-    },
-    {
-      key: 'steady-m',
-      title: '또박또박 · 남자',
-      rows: steadyRows(male),
+      rows: steadyRows,
     },
     {
       key: 'chirp-f',
-      title: '최신 · 여자',
-      hint: '더 자연스럽지만 부를 때마다 조금씩 다르게 읽어요',
+      title: '자연스러운 목소리 · 여자',
+      hint: '사람에 더 가깝지만 부를 때마다 조금씩 다르게 읽어요. 받아쓰기에는 위쪽을 권해요',
       rows: chirpRows(female),
+      folded: true,
     },
     {
       key: 'chirp-m',
-      title: '최신 · 남자',
+      title: '자연스러운 목소리 · 남자',
       rows: chirpRows(male),
+      folded: true,
     },
     {
       key: 'dup',
       title: '같은 목소리의 낮은 품질',
-      hint: '위쪽 같은 이름과 같은 성우예요. 굳이 고를 이유는 없어요',
+      hint: '위와 같은 번호면 같은 성우예요. 굳이 고를 이유는 없어요',
       rows: duplicates.map((v) => ({ name: v.name, label: classicLabel(v.name) })),
       folded: true,
     },
@@ -195,7 +236,10 @@ export function VoiceSettings() {
   const [openFolded, setOpenFolded] = useState(false);
 
   useEffect(() => {
-    setSelected(readVoice());
+    // 고른 적이 없으면 기본 목소리가 선택된 것으로 보여 줍니다.
+    // 아무것도 안 켜져 있으면 "그럼 지금 뭘로 읽고 있지?"가 됩니다.
+    // 저장은 하지 않습니다 — 나중에 기본이 바뀌면 따라가야 하니까요.
+    setSelected(readVoice() ?? DEFAULT_VOICE);
     fetch('/api/tts/voices')
       .then((r) => (r.ok ? r.json() : { voices: [] }))
       .then((payload: { voices?: VoiceOption[] }) => setVoices(payload.voices ?? []))
@@ -203,6 +247,7 @@ export function VoiceSettings() {
   }, []);
 
   const groups = useMemo(() => (voices ? buildGroups(voices) : []), [voices]);
+  const foldedCount = groups.filter((g) => g.folded).reduce((n, g) => n + g.rows.length, 0);
 
   // 접힌 묶음 안의 목소리를 쓰고 있으면 펼쳐 둡니다. 자기가 고른 게 안 보이면 안 됩니다.
   useEffect(() => {
@@ -228,8 +273,22 @@ export function VoiceSettings() {
     <>
       <h2 className="section-title mb-2">목소리</h2>
 
+      {/*
+        접힌 묶음을 한 번에 펼칩니다.
+        묶음마다 "펼쳐 보기"를 두면 버튼만 셋이 되어 오히려 복잡해집니다.
+      */}
+      {!openFolded && foldedCount > 0 && (
+        <button
+          className="btn btn-quiet mb-6 w-full justify-center text-sm"
+          onClick={() => setOpenFolded(true)}
+        >
+          다른 목소리 더 보기 ({foldedCount}개)
+        </button>
+      )}
+
       {groups.map((group) => {
         const hidden = group.folded && !openFolded;
+        if (hidden) return null;
         return (
           <div key={group.key} className="mb-4">
             <div className="mb-1.5 flex items-baseline gap-2 px-1">
@@ -244,15 +303,7 @@ export function VoiceSettings() {
               </p>
             )}
 
-            {hidden ? (
-              <button
-                className="btn btn-quiet w-full justify-center"
-                onClick={() => setOpenFolded(true)}
-              >
-                펼쳐 보기
-              </button>
-            ) : (
-              <ul className="surface flex flex-col divide-y" style={{ borderColor: 'var(--rule)' }}>
+            <ul className="surface flex flex-col divide-y" style={{ borderColor: 'var(--rule)' }}>
                 {group.rows.map((row) => {
                   const on = row.name === selected;
                   return (
@@ -273,7 +324,17 @@ export function VoiceSettings() {
                           {on && <span className="text-[11px] text-white">✓</span>}
                         </span>
                         <span className="flex-1">
-                          <span className="block text-[15px] font-semibold">{row.label}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="text-[15px] font-semibold">{row.label}</span>
+                            {row.name === DEFAULT_VOICE && (
+                              <span
+                                className="rounded px-1.5 py-0.5 text-[10px] font-bold"
+                                style={{ background: 'var(--grid-tint)', color: 'var(--grid-deep)' }}
+                              >
+                                기본
+                              </span>
+                            )}
+                          </span>
                           {/* 어느 목소리인지 서로 이야기할 일이 있어 원래 이름도 작게 남깁니다. */}
                           <span
                             className="block text-[10.5px]"
@@ -289,8 +350,7 @@ export function VoiceSettings() {
                     </li>
                   );
                 })}
-              </ul>
-            )}
+            </ul>
           </div>
         );
       })}

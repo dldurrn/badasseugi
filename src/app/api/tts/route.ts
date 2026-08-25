@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { DEFAULT_VOICE } from '@/lib/tts';
 import { badRequest, readJson, requireUser } from '@/lib/api';
 
 /**
@@ -22,7 +23,6 @@ const ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 const MAX_TEXT = 200;
 
 /** 기본 목소리. 설정에서 고르면 그 값이 넘어옵니다. */
-const DEFAULT_VOICE = 'ko-KR-Neural2-A';
 
 
 interface Body {

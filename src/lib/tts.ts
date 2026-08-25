@@ -16,6 +16,18 @@ import { normalize } from './hangul';
 
 export type SpeechRate = 0.65 | 0.85 | 1.0;
 
+/**
+ * 아무것도 고르지 않았을 때 쓰는 목소리.
+ *
+ * 고전 계열(Neural2)이라 **같은 문장을 몇 번 불러도 똑같이 읽습니다.**
+ * 받아쓰기는 "다시 듣기"가 매번 같아야 아이가 제 답을 견줄 수 있어서,
+ * 자연스럽지만 부를 때마다 달라지는 최신 계열을 기본으로 두지 않습니다.
+ *
+ * 서버(합성할 때)와 화면(무엇을 쓰는 중인지 보여줄 때)이 같은 값을 봐야 하므로
+ * 양쪽이 아니라 여기 한 곳에 둡니다.
+ */
+export const DEFAULT_VOICE = 'ko-KR-Neural2-A';
+
 export const RATE_LABEL: Record<SpeechRate, string> = {
   0.65: '아주 천천히',
   0.85: '천천히',
