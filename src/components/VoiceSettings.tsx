@@ -9,23 +9,25 @@ import { appSpeech, readRate, readVoice, writeVoice } from '@/lib/tts-app';
  *
  * 쓸 수 있는 한국어 목소리가 41개입니다. 그중 **넷만 펼쳐 두고** 나머지는 접습니다.
  *
- * 왜 넷인가
- * 계열에 따라 성격이 뚜렷하게 갈립니다.
- * - 고전 계열(Neural2/Wavenet/Standard)은 같은 문장을 몇 번을 불러도 **똑같이** 읽습니다.
- * - Chirp3 계열은 생성형이라 부를 때마다 길이와 억양이 조금씩 **달라집니다**.
+ * 한 번 뒤집힌 판단입니다
+ * 처음에는 고전 계열(Neural2/Wavenet/Standard)을 앞에 세웠습니다.
+ * 같은 문장을 몇 번 불러도 똑같이 읽으니 "다시 듣기"가 흔들리지 않는다는 이유였습니다.
  *
- * 받아쓰기는 "다시 듣기"가 매번 같아야 아이가 제 답을 견줄 수 있습니다.
- * 그래서 고전 계열만 권하는데, 그게 넷입니다(여자 둘·남자 둘).
+ * 그런데 실제로 들어 보니 **또렷하지 않았습니다.** 「송골」이 「쏭골」처럼 들려
+ * 아이가 한 번 더 짚어 봐야 했습니다. 받아쓰기에서 안 들리면 나머지가 다 무의미합니다.
  *
- * 예전에는 서른셋을 늘어놓았습니다. 그중 스물아홉이 우리가 권하지 않는 최신 계열이었고,
- * 화면에 경고까지 붙여 두었습니다 — **권하지 않는 것이 목록의 아홉 할**이었던 셈입니다.
- * 지우지는 않습니다. 아이가 좋아하는 목소리가 있을 수 있고, 연습 모드라면 매번 달라도 됩니다.
+ * 그리고 "매번 달라진다"는 걱정은 **캐시가 이미 막고 있었습니다**(tts-app.ts).
+ * 한 세션은 화면 하나라 담아 둔 소리를 그대로 다시 틉니다.
+ * 걱정하던 문제를 이미 풀어 놓고 그것 때문에 설계를 비틀고 있었습니다.
+ *
+ * 그래서 Chirp3 넷을 앞에 세우고 고전 계열은 아래로 내렸습니다.
+ * 고전 계열도 지우지는 않습니다 — 완전히 일정한 소리가 필요한 경우가 있을 수 있습니다.
  *
  * Standard-A / Wavenet-A / Neural2-A 는 **같은 성우**이고 합성 품질만 다릅니다
  * (글자당 발화 시간이 정확히 같았습니다). 글자마다 가장 좋은 등급 하나만 세우고 나머지는 접습니다.
  *
  * 미리듣기는 글자 수로 과금되고 하루 한도(2만 자)를 아이와 나눠 씁니다.
- * 서른셋을 다 들어 보면 그날 아이가 쓸 몫이 줄어듭니다 — 이것도 접는 이유입니다.
+ * 마흔 개를 다 들어 보면 그날 아이가 쓸 몫이 줄어듭니다 — 이것도 접는 이유입니다.
  *
  * 목록 자체는 코드에 적지 않고 서버에 물어봅니다. Google이 목소리를 계속 바꾸기 때문입니다.
  */
@@ -118,6 +120,27 @@ interface Group {
 }
 
 /**
+ * 앞에 세우는 목소리 넷.
+ *
+ * 한국어 Chirp3 서른 개를 같은 문장으로 세 번씩 합성해 길이의 흔들림을 재고,
+ * Google이 공개한 성격표에서 또렷함과 어울리는 것을 골랐습니다.
+ *
+ *   Gacrux    흔들림 0.12초  — 가장 안정적이고 짧은 낱말을 느긋하게 읽습니다
+ *   Sulafat   흔들림 0.20초
+ *   Alnilam   흔들림 0.32초
+ *   Orus      흔들림 0.44초
+ *
+ * 흔들림이 큰 목소리(0.6~1.7초)는 속도 버튼을 눌러도 효과가 거기 묻혀 버립니다.
+ * 실제로 Leda는 「천천히」가 83%로 죽어 있었고, Gacrux는 99%로 살아 있습니다.
+ */
+const RECOMMENDED = [
+  { star: 'Gacrux', label: '여자 1 · 어른스러운' },
+  { star: 'Sulafat', label: '여자 2 · 따뜻한' },
+  { star: 'Alnilam', label: '남자 1 · 단단한' },
+  { star: 'Orus', label: '남자 2 · 또렷한' },
+] as const;
+
+/**
  * 목소리 이름을 사람이 읽을 수 있게 바꿉니다.
  *
  * `ko-KR-Neural2-A`는 아무것도 알려 주지 않습니다.
@@ -180,43 +203,44 @@ function buildGroups(voices: VoiceOption[]): Group[] {
   /*
     권하는 넷만 펼쳐 둡니다.
 
-    예전에는 서른세 개를 늘어놓았는데, 그중 스물아홉이 최신 계열이었습니다.
-    최신 계열은 부를 때마다 조금씩 다르게 읽어서 **받아쓰기에는 맞지 않습니다** —
-    아이가 "다시 듣기"를 눌렀을 때 아까와 다른 소리가 나면 제 답을 견줄 수가 없습니다.
-    우리가 권하지 않는 것이 목록의 아홉 할을 차지하고 있었던 셈입니다.
+    한국어 Chirp3 서른 개를 문장 하나로 세 번씩 합성해서, 길이가 얼마나 흔들리는지 쟀습니다.
+    흔들림이 큰 목소리는 속도 버튼을 눌러도 그 효과가 흔들림에 묻혀 버립니다.
+    아래 넷은 흔들림이 작으면서 성격도 또렷한 쪽이라, 속도와 어절 쉼이 제대로 먹습니다.
 
-    지우지는 않습니다. 아이가 특정 목소리를 좋아할 수 있고,
-    연습 모드라면 매번 달라도 크게 문제되지 않습니다.
-
-    미리듣기가 글자 수로 과금되고 하루 한도(2만 자)를 아이와 나눠 쓴다는 점도 있습니다.
-    서른세 개를 다 들어 보면 그날 아이가 쓸 몫이 줄어듭니다.
+    고전 계열(Neural2 등)은 아래로 내렸습니다. 완전히 일정한 대신 흐리게 들립니다.
+    받아쓰기는 안 들리면 나머지가 다 무의미해서, 또렷함을 앞에 둡니다.
   */
-  const steadyRows = [...steady]
-    .map((v) => ({ name: v.name, label: classicLabel(v.name) }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+  const recommendedRows = RECOMMENDED.map((r) => ({
+    name: `ko-KR-Chirp3-HD-${r.star}`,
+    label: r.label,
+  })).filter((r) => voices.some((v) => v.name === r.name));
 
-  // 기본 목소리를 맨 앞에 둡니다. 고르지 않았을 때 실제로 나는 소리입니다.
-  const at = steadyRows.findIndex((r) => r.name === DEFAULT_VOICE);
-  if (at > 0) steadyRows.unshift(...steadyRows.splice(at, 1));
+  const isRecommended = (v: VoiceOption) => recommendedRows.some((r) => r.name === v.name);
 
   return [
     {
-      key: 'steady',
+      key: 'best',
       title: '받아쓰기에 알맞은 목소리',
-      hint: '몇 번을 들어도 똑같이 읽어요',
-      rows: steadyRows,
+      hint: '또렷하게 읽고, 속도와 또박또박 듣기가 잘 들어요',
+      rows: recommendedRows,
     },
     {
       key: 'chirp-f',
-      title: '자연스러운 목소리 · 여자',
-      hint: '사람에 더 가깝지만 부를 때마다 조금씩 다르게 읽어요. 받아쓰기에는 위쪽을 권해요',
-      rows: chirpRows(female),
+      title: '다른 목소리 · 여자',
+      rows: chirpRows((v) => female(v) && !isRecommended(v)),
       folded: true,
     },
     {
       key: 'chirp-m',
-      title: '자연스러운 목소리 · 남자',
-      rows: chirpRows(male),
+      title: '다른 목소리 · 남자',
+      rows: chirpRows((v) => male(v) && !isRecommended(v)),
+      folded: true,
+    },
+    {
+      key: 'steady',
+      title: '옛 방식 목소리',
+      hint: '몇 번을 불러도 완전히 같은 소리예요. 대신 조금 흐리게 들릴 수 있어요',
+      rows: [...steady].map((v) => ({ name: v.name, label: classicLabel(v.name) })),
       folded: true,
     },
     {
