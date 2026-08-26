@@ -3,6 +3,7 @@ import { ParentLockSettings } from '@/components/ParentLockSettings';
 import { SignOutButton } from '@/components/SignOutButton';
 import { SoundToggle } from '@/components/SoundToggle';
 import { RateSettings } from '@/components/RateSettings';
+import { TtsStatus } from '@/components/TtsStatus';
 import { VoiceSettings } from '@/components/VoiceSettings';
 import { WriteModeSettings } from '@/components/WriteModeSettings';
 import { MAX_CHILDREN } from '@/lib/profile';
@@ -58,6 +59,9 @@ export default async function SettingsPage() {
 
       {isParent ? (
         <>
+          {/* 소리가 기기 목소리로 새고 있으면 알립니다. 잘 나오면 아무것도 안 뜹니다. */}
+          <TtsStatus />
+
           {/* 음성 서비스가 설정되어 있을 때만 나타납니다 */}
           <VoiceSettings />
 

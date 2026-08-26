@@ -107,7 +107,69 @@ type FetchResult =
   /** 키가 없어 앞으로도 안 됨 */
   | { kind: 'disabled' }
   /** 이번만 실패 */
-  | { kind: 'failed' };
+  | { kind: 'failed'; status?: number };
+
+/* ------------------------------------------------------------------ */
+/* 서버 음성이 안 될 때 부모에게 알리기                                  */
+/* ------------------------------------------------------------------ */
+
+const FALLBACK_KEY = 'badasseugi:tts-fallback';
+
+/** 왜 서버 음성을 못 썼는지 */
+export type FallbackReason = 'not-configured' | 'daily-limit' | 'failed';
+
+export interface FallbackNote {
+  reason: FallbackReason;
+  /** 마지막으로 넘어간 때 */
+  at: number;
+}
+
+/**
+ * 아이 화면에는 아무것도 띄우지 않지만, **부모는 알아야 합니다.**
+ *
+ * 서버 음성이 안 되면 브라우저 내장 음성으로 조용히 넘어갑니다(그게 맞습니다 —
+ * 아이가 문제 풀다 "음성 오류"를 보면 거기서 멈춥니다).
+ * 문제는 그 조용함 때문에 **며칠째 내장 음성으로 읽고 있어도 아무도 모른다**는 것입니다.
+ *
+ * 그래서 넘어간 사실만 기기에 적어 두고, 보호자 설정 화면에서 보여 줍니다.
+ * 다음에 서버 음성이 되면 지웁니다.
+ */
+function noteFallback(reason: FallbackReason): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(FALLBACK_KEY, JSON.stringify({ reason, at: Date.now() }));
+  } catch {
+    // 저장 공간이 막혀 있어도 소리는 나야 합니다.
+  }
+}
+
+function clearFallback(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(FALLBACK_KEY);
+  } catch {
+    /* 무시 */
+  }
+}
+
+/** 보호자 설정 화면이 읽습니다. */
+export function readFallback(): FallbackNote | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(FALLBACK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<FallbackNote>;
+    if (typeof parsed.at !== 'number' || !parsed.reason) return null;
+    return { reason: parsed.reason, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
+
+/** 상태를 다시 재고 싶을 때(보호자 화면의 "다시 확인") */
+export function forgetFallback(): void {
+  clearFallback();
+}
 
 async function fetchAudio(
   text: string,
@@ -131,7 +193,7 @@ async function fetchAudio(
     });
 
     if (response.status === 503) return { kind: 'disabled' };
-    if (!response.ok) return { kind: 'failed' };
+    if (!response.ok) return { kind: 'failed', status: response.status };
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -166,6 +228,45 @@ function playUrl(url: string, signal: AbortSignal): Promise<void> {
   });
 }
 
+/**
+ * 서버 음성을 시도하고 됐으면 재생합니다.
+ *
+ * 안 됐으면 **왜 안 됐는지 적어 두고** false를 돌려줍니다.
+ * 부르는 쪽은 그때 브라우저 음성으로 넘어가면 됩니다.
+ *
+ * 중단(아이가 다음 문제로 넘어가거나 다시 누른 경우)은 실패로 적지 않습니다.
+ * 그걸 적으면 정상으로 쓰는 동안에도 경고가 뜹니다.
+ */
+async function playFromServer(
+  text: string,
+  rate: number,
+  gapMs: number,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (serverUsable === false) return false;
+
+  const result = await fetchAudio(text, rate, signal, gapMs);
+
+  if (result.kind === 'ok') {
+    serverUsable = true;
+    clearFallback();
+    await playUrl(result.url, signal);
+    return true;
+  }
+
+  if (signal.aborted) return false;
+
+  if (result.kind === 'disabled') {
+    // 키가 없는 경우에만 잠급니다. 일시적 실패로 잠가 버리면
+    // 잠깐 끊겼다는 이유로 남은 세션 내내 내장 음성만 쓰게 됩니다.
+    serverUsable = false;
+    noteFallback('not-configured');
+  } else {
+    noteFallback(result.status === 429 ? 'daily-limit' : 'failed');
+  }
+  return false;
+}
+
 export const appSpeech: SpeechProvider = {
   isAvailable() {
     // 서버가 안 되면 브라우저 음성으로 넘어가므로, 둘 중 하나라도 되면 쓸 수 있습니다.
@@ -174,19 +275,8 @@ export const appSpeech: SpeechProvider = {
 
   async speak(text, rate, signal) {
     if (signal.aborted) return;
-
-    if (serverUsable !== false) {
-      const result = await fetchAudio(text, rate, signal);
-
-      if (result.kind === 'ok') {
-        serverUsable = true;
-        await playUrl(result.url, signal);
-        return;
-      }
-      // 키가 없는 경우에만 잠급니다. 일시적 실패는 다음에 다시 시도합니다.
-      if (result.kind === 'disabled') serverUsable = false;
-      if (signal.aborted) return;
-    }
+    if (await playFromServer(text, rate, 0, signal)) return;
+    if (signal.aborted) return;
 
     await browserSpeech.speak(text, rate, signal);
   },
@@ -202,18 +292,8 @@ export const appSpeech: SpeechProvider = {
    */
   async speakWithPauses(text, rate, gapMs, signal) {
     if (signal.aborted) return;
-
-    if (serverUsable !== false) {
-      const result = await fetchAudio(text, rate, signal, gapMs);
-
-      if (result.kind === 'ok') {
-        serverUsable = true;
-        await playUrl(result.url, signal);
-        return;
-      }
-      if (result.kind === 'disabled') serverUsable = false;
-      if (signal.aborted) return;
-    }
+    if (await playFromServer(text, rate, gapMs, signal)) return;
+    if (signal.aborted) return;
 
     for (const word of text.split(' ').filter(Boolean)) {
       if (signal.aborted) return;
