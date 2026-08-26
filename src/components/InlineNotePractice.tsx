@@ -62,7 +62,8 @@ export function InlineNotePractice({
   const [speaking, setSpeaking] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  // 서버(Google TTS)를 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
+  // 서버 음성을 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
+  // 서버가 어느 회사를 쓰는지는 여기서 알 필요가 없습니다(lib/tts-engines.ts).
   const speech = useMemo(() => new SpeechController(appSpeech), []);
 
   useEffect(() => {

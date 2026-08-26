@@ -10,7 +10,7 @@ import {
   type SpeechRate,
 } from '@/lib/tts';
 import { sfx } from '@/lib/sfx';
-import { appSpeech, RATES, readRate, writeRate } from '@/lib/tts-app';
+import { appSpeech, DEFAULT_RATE, RATES, readRate, writeRate } from '@/lib/tts-app';
 import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
 import { writingToText } from '@/lib/wongoji';
 import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
@@ -67,12 +67,13 @@ export function DictationSession({
   const [result, setResult] = useState<GradeResult | null>(null);
   const [outcomes, setOutcomes] = useState<SessionOutcome[]>([]);
   // 서버에서 그릴 때는 localStorage를 읽을 수 없어 기본값으로 두고, 뜬 뒤에 저장된 값을 불러옵니다.
-  const [rate, setRate] = useState<SpeechRate>(0.85);
+  const [rate, setRate] = useState<SpeechRate>(DEFAULT_RATE);
   const [speaking, setSpeaking] = useState<ReadingStyle | null>(null);
   const [writeMode, setWriteMode] = useState<WriteMode>('wongoji');
 
   const inputRef = useRef<HTMLInputElement>(null);
-  // 서버(Google TTS)를 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
+  // 서버 음성을 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
+  // 서버가 어느 회사를 쓰는지는 여기서 알 필요가 없습니다(lib/tts-engines.ts).
   const speech = useMemo(() => new SpeechController(appSpeech), []);
   const completedRef = useRef(false);
 

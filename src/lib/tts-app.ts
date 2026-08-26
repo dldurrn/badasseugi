@@ -4,7 +4,18 @@ import { browserSpeech, type SpeechProvider, type SpeechRate } from './tts';
 
 /** 화면에서 고를 수 있는 속도. 이 세 가지 말고는 저장하지 않습니다. */
 export const RATES: readonly SpeechRate[] = [0.65, 0.85, 1.0];
-export const DEFAULT_RATE: SpeechRate = 0.85;
+/**
+ * 기본 속도는 「보통」입니다.
+ *
+ * 예전에는 0.85(천천히)였습니다. 저학년이니 천천히가 낫겠다는 짐작이었는데,
+ * 실제로 들어 보니 **늦출수록 오히려 안 들렸습니다.**
+ * TTS는 속도를 낮추면 소리를 늘려 재생하는데, 마찰음(ㅅ)이 길어지면
+ * 귀는 그걸 된소리(ㅆ)로 듣습니다 — 「송골」이 「쏭골」로 들리던 게 이것이었습니다.
+ *
+ * 천천히가 필요한 아이는 세션 화면에서 그때 누르면 됩니다.
+ * 기본값은 가장 또렷한 쪽이어야 합니다.
+ */
+export const DEFAULT_RATE: SpeechRate = 1.0;
 
 /**
  * 이 앱이 실제로 쓰는 음성 공급자.
