@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GradeSheet } from './GradeSheet';
+import { NextButton } from './NextButton';
 import type { SpellingQuestion } from '@/data/spelling-bank';
 import { grade, type GradeResult } from '@/lib/grading';
 import { saveSession } from '@/lib/save-session';
@@ -214,9 +215,10 @@ export function InlineNotePractice({
           </p>
         )}
 
-        <button className="btn btn-primary btn-lg mt-3" onClick={close}>
+        {/* 틀렸으면 정답을 볼 틈을 줍니다. 접으면 다시 못 보니까요. */}
+        <NextButton hold={!correct} onClick={close}>
           닫기
-        </button>
+        </NextButton>
       </div>
     );
   }

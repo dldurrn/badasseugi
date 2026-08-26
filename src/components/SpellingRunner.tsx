@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { NextButton } from './NextButton';
 import { SessionResult } from './SessionResult';
 import type { SpellingKind, SpellingQuestion } from '@/data/spelling-bank';
 import { initSfx, sfx } from '@/lib/sfx';
@@ -382,9 +383,10 @@ export function SpellingRunner({
             )}
           </section>
 
-          <button onClick={next} className="btn btn-primary btn-lg mt-3">
+          {/* 틀렸으면 정답과 설명을 볼 틈을 줍니다 */}
+          <NextButton hold={!correct} onClick={next}>
             {isLast ? '결과 보기' : '다음 문제'}
-          </button>
+          </NextButton>
         </>
       )}
     </div>

@@ -211,3 +211,56 @@ export function growingGrid(cells: string[], cols = WONGOJI_COLS): string[] {
   const rowIsFull = cells.length > 0 && cells.length % cols === 0;
   return padToGrid(cells, rowIsFull ? used + 1 : used, cols);
 }
+
+/* ------------------------------------------------------------------ */
+/* 칸 사이를 오가기                                                     */
+/*                                                                     */
+/* 입력칸은 속으로 한 줄짜리라 「줄」이라는 개념이 없습니다.              */
+/* 그대로 두면 ↑↓는 맨 앞·맨 끝으로 튀고, Home/End는 글 전체의 처음과 끝 */
+/* 으로 갑니다. 원고지에서는 셋 다 **그 줄** 안의 일이어야 합니다.        */
+/* ------------------------------------------------------------------ */
+
+/** ↑(-1) 또는 ↓(1)로 한 줄 옮겼을 때 갈 칸. 글자 밖으로는 나가지 않습니다. */
+export function cellByRow(
+  caret: number,
+  direction: -1 | 1,
+  total: number,
+  cols = WONGOJI_COLS,
+): number {
+  const moved = caret + direction * cols;
+  return Math.min(Math.max(moved, 0), Math.max(total, 0));
+}
+
+/** 지금 있는 줄의 첫 칸 */
+export function rowStart(caret: number, cols = WONGOJI_COLS): number {
+  const safe = Math.max(caret, 0);
+  return safe - (safe % cols);
+}
+
+/**
+ * 지금 있는 줄의 끝.
+ *
+ * 마지막 글자 **뒤**를 가리킵니다. 그래야 거기서 이어 쓸 수 있습니다.
+ * 줄이 다 차 있으면 다음 줄 첫 칸이 되는데, 그게 곧 이 줄의 끝자리입니다.
+ */
+export function rowEnd(caret: number, total: number, cols = WONGOJI_COLS): number {
+  return Math.min(rowStart(caret, cols) + cols, Math.max(total, 0));
+}
+
+/**
+ * 짚은 칸을 지웁니다.
+ *
+ * 종이 원고지에서는 칸을 짚고 지우면 **그 칸**이 지워집니다.
+ * 입력칸의 백스페이스는 언제나 앞 칸을 지우므로,
+ * 「학꾜에」의 「꾜」를 고치려고 그 칸을 짚고 지우면 「학」이 사라집니다.
+ *
+ * 칸이 비어 있거나(=끝을 넘어섰거나) 자리가 어긋나면 문장을 그대로 돌려줍니다.
+ * 부르는 쪽은 그때 원래 백스페이스에 맡깁니다 — 끝에서 이어 쓰는 중이라면
+ * 방금 쓴 글자를 무르는 것이 맞으니까요.
+ */
+export function eraseCell(value: string, cell: number): string {
+  const chars = Array.from(value ?? '');
+  if (cell < 0 || cell >= chars.length) return value ?? '';
+  chars.splice(cell, 1);
+  return chars.join('');
+}

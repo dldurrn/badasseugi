@@ -3,7 +3,11 @@ import { DICTATION_BANK } from '@/data/dictation-bank';
 import { normalize } from './hangul';
 import {
   EMPTY,
+  cellByRow,
   cellToTextOffset,
+  eraseCell,
+  rowEnd,
+  rowStart,
   WONGOJI_COLS,
   WONGOJI_MIN_ROWS,
   growingGrid,
@@ -358,5 +362,111 @@ describe('따옴표 — 마침표 뒤에 닫는 따옴표가 오는 경우', () 
 
   it('여는 따옴표 앞 띄어쓰기는 그대로 남는다', () => {
     expect(toText(toCells('그가 "안녕" 했어요.'))).toBe('그가 "안녕" 했어요.');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* 칸 사이를 오가기                                                     */
+/*                                                                     */
+/* 입력칸은 속으로 한 줄짜리라 「줄」이 없습니다. 그대로 두면 ↑↓가         */
+/* 맨 앞·맨 끝으로 튀고, 지우개가 짚은 칸이 아니라 앞 칸을 지웁니다.       */
+/* ------------------------------------------------------------------ */
+
+describe('cellByRow — ↑↓는 한 줄(15칸)씩', () => {
+  it('아래로 한 줄이면 15칸 뒤', () => {
+    // 30칸을 채운 상태(두 줄). 3번 칸에서 아래로 → 18번 칸
+    expect(cellByRow(3, 1, 30)).toBe(18);
+  });
+
+  it('위로 한 줄이면 15칸 앞', () => {
+    expect(cellByRow(18, -1, 30)).toBe(3);
+  });
+
+  it('첫 줄에서 위로 눌러도 음수로 안 간다', () => {
+    expect(cellByRow(3, -1, 30)).toBe(0);
+    expect(cellByRow(0, -1, 30)).toBe(0);
+  });
+
+  it('글자 끝을 넘어서지 않는다 — 빈 칸에 커서를 두면 공백이 답이 됩니다', () => {
+    // 7글자뿐인데 아래로 내려가면 7(끝)에 멈춰야 합니다
+    expect(cellByRow(3, 1, 7)).toBe(7);
+    expect(cellByRow(0, 1, 0)).toBe(0);
+  });
+
+  it('마지막 줄에서 아래로 눌러도 끝에 멈춘다', () => {
+    expect(cellByRow(28, 1, 30)).toBe(30);
+  });
+});
+
+describe('rowStart / rowEnd — 그 줄 안에서만', () => {
+  it('첫 줄', () => {
+    expect(rowStart(0)).toBe(0);
+    expect(rowStart(7)).toBe(0);
+    expect(rowStart(14)).toBe(0);
+  });
+
+  it('둘째 줄', () => {
+    expect(rowStart(15)).toBe(15);
+    expect(rowStart(20)).toBe(15);
+    expect(rowStart(29)).toBe(15);
+  });
+
+  it('줄이 다 찼으면 끝은 다음 줄 첫 칸 — 거기가 이 줄의 끝자리입니다', () => {
+    expect(rowEnd(3, 30)).toBe(15);
+    expect(rowEnd(20, 30)).toBe(30);
+  });
+
+  it('줄이 덜 찼으면 글자 끝에서 멈춘다', () => {
+    expect(rowEnd(3, 7)).toBe(7);
+    expect(rowEnd(0, 0)).toBe(0);
+  });
+
+  it('음수가 들어와도 첫 줄로 본다', () => {
+    expect(rowStart(-3)).toBe(0);
+    expect(rowEnd(-3, 10)).toBe(10);
+  });
+});
+
+describe('eraseCell — 짚은 칸이 지워진다', () => {
+  it('가운데 칸을 짚고 지우면 그 글자가 사라진다', () => {
+    // 「학꾜에」의 「꾜」를 고치려고 1번 칸을 짚은 상황.
+    // 원래 백스페이스는 앞 칸(「학」)을 지웁니다 — 그게 바로 고치려던 문제입니다.
+    expect(eraseCell('학꾜에', 1)).toBe('학에');
+  });
+
+  it('첫 칸도 지워진다', () => {
+    expect(eraseCell('학꾜에', 0)).toBe('꾜에');
+  });
+
+  it('마지막 글자 칸', () => {
+    expect(eraseCell('학꾜에', 2)).toBe('학꾜');
+  });
+
+  it('공백 칸을 짚으면 띄어쓰기가 지워진다', () => {
+    expect(eraseCell('나는 밥을', 2)).toBe('나는밥을');
+  });
+
+  it('글자 끝을 넘겨 짚으면 그대로 둔다 — 원래 백스페이스에 맡깁니다', () => {
+    expect(eraseCell('학꾜에', 3)).toBe('학꾜에');
+    expect(eraseCell('학꾜에', 99)).toBe('학꾜에');
+    expect(eraseCell('', 0)).toBe('');
+    expect(eraseCell('학꾜에', -1)).toBe('학꾜에');
+  });
+
+  it('이어서 누르면 뒤 글자가 밀려 들어와 계속 지워진다', () => {
+    // 커서는 짚은 칸에 그대로 둡니다.
+    let text = '가나다라';
+    text = eraseCell(text, 1);
+    expect(text).toBe('가다라');
+    text = eraseCell(text, 1);
+    expect(text).toBe('가라');
+  });
+
+  it('지운 뒤에도 채점에 넘길 문장은 온전하다', () => {
+    // 「우유를 마시고,빵도」에서 잘못 친 「빵」을 지우는 상황.
+    // 쉼표 규칙이 흐트러지지 않아야 합니다.
+    const after = eraseCell('우유를 마시고,빵도', 8);
+    expect(after).toBe('우유를 마시고,도');
+    expect(writingToText(after)).toBe('우유를 마시고, 도');
   });
 });

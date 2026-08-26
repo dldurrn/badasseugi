@@ -16,6 +16,13 @@ interface WongojiSheetProps {
   cells: string[];
   /** 지금 쓸 자리. 없으면 커서를 그리지 않습니다(미리보기). */
   cursor?: number;
+  /**
+   * 입력칸에 포커스가 있는가.
+   *
+   * 커서 칸을 언제나 같은 세기로 칠하면 **지금 쓰는 중인지 그냥 표시인지 구분이 안 됩니다.**
+   * 포커스가 있을 때만 진한 초록으로 짚어 주고, 없을 때는 옅게 자리만 남깁니다.
+   */
+  active?: boolean;
   /** 조합 중이라 아직 확정되지 않은 칸 */
   composingAt?: number;
   /**
@@ -33,6 +40,7 @@ const PUNCT = new Set([',', '.', '?', '!', '…', '"', "'", ':', ';']);
 export function WongojiSheet({
   cells,
   cursor,
+  active = false,
   composingAt,
   gridRef,
   markPunct = false,
@@ -53,7 +61,7 @@ export function WongojiSheet({
       */}
       {cells.map((ch, i) => {
         const classes = ['wg-cell'];
-        if (i === cursor) classes.push('wg-cell--cursor');
+        if (i === cursor) classes.push(active ? 'wg-cell--here' : 'wg-cell--cursor');
         if (i === composingAt) classes.push('wg-cell--ime');
         if (markPunct && PUNCT.has(ch)) classes.push('wg-cell--punct');
 

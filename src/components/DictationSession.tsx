@@ -15,6 +15,7 @@ import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
 import { writingToText } from '@/lib/wongoji';
 import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
 import { GradeSheet } from './GradeSheet';
+import { NextButton } from './NextButton';
 import { WongojiInput } from './WongojiInput';
 import type { Mode } from '@/lib/types';
 
@@ -402,9 +403,10 @@ export function DictationSession({
       {phase === 'reviewing' && result && (
         <>
           <GradeSheet result={result} note={starNote} />
-          <button onClick={next} className="btn btn-primary btn-lg mt-3">
+          {/* 틀렸으면 정답을 볼 틈을 줍니다 — 습관처럼 누르다 지나치지 않게 */}
+          <NextButton hold={!result.correct} onClick={next}>
             {isLast ? '결과 보기' : '다음 문제'}
-          </button>
+          </NextButton>
         </>
       )}
     </div>
