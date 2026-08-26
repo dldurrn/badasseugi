@@ -204,7 +204,13 @@ export function DictationSession({
       : null;
 
   return (
-    <div className="page">
+    /*
+      원고지로 쓸 때만 기둥을 넓힙니다(안쪽 720px).
+      15칸 격자는 폭이 곧 글자 크기라 좁으면 글자가 작아집니다.
+      「그냥 쓰기」는 한 줄짜리 입력칸이라 넓힐 까닭이 없습니다 —
+      넓히면 오히려 한 줄이 길어져 눈이 되돌아오기 힘들어집니다.
+    */
+    <div className={writeMode === 'wongoji' ? 'page page--write' : 'page'}>
       {/* 상단 — 진행 상황 */}
       <header className="mb-5">
         <div className="mb-3 flex items-center gap-2">
