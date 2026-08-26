@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { DEFAULT_VOICE, SpeechController } from '@/lib/tts';
+import { SpeechController } from '@/lib/tts';
 import { appSpeech, readRate, readVoice, writeVoice } from '@/lib/tts-app';
 
 /**
@@ -34,8 +34,36 @@ import { appSpeech, readRate, readVoice, writeVoice } from '@/lib/tts-app';
 
 interface VoiceOption {
   name: string;
+  /** 서버가 지어 준 이름. 타입캐스트처럼 이름 규칙이 없는 곳에서 씁니다 */
+  label?: string;
   /** MALE / FEMALE / NEUTRAL */
   gender: string;
+}
+
+/**
+ * 서버가 이름을 지어 보낸 경우 — 우리가 규칙을 만들 게 없습니다.
+ *
+ * 타입캐스트가 그렇습니다. 목소리에 언어 정보도, 성별도, 나이도 주지 않아서
+ * 서버가 손으로 고른 목록을 이름까지 붙여 보냅니다.
+ * 그럴 때는 성별로만 갈라 그대로 보여 줍니다.
+ */
+function labelledGroups(voices: VoiceOption[]): Group[] {
+  const rows = (pick: (v: VoiceOption) => boolean): VoiceRow[] =>
+    voices.filter(pick).map((v) => ({ name: v.name, label: v.label ?? v.name }));
+
+  return [
+    {
+      key: 'labelled-f',
+      title: '여자 목소리',
+      hint: '아이가 좋아하는 목소리로 골라 주세요',
+      rows: rows((v) => v.gender === 'FEMALE'),
+    },
+    {
+      key: 'labelled-m',
+      title: '남자 목소리',
+      rows: rows((v) => v.gender !== 'FEMALE'),
+    },
+  ].filter((g) => g.rows.length > 0);
 }
 
 const SAMPLE = '나는 학교에 갔어요.';
@@ -163,7 +191,10 @@ function labelByLetter(voices: VoiceOption[]): Map<string, string> {
   return map;
 }
 
-function buildGroups(voices: VoiceOption[]): Group[] {
+function buildGroups(voices: VoiceOption[], defaultVoice: string | null): Group[] {
+  // 서버가 이름을 붙여 보냈으면 그대로 씁니다. 우리가 규칙을 만들 게 없습니다.
+  if (voices.some((v) => v.label)) return labelledGroups(voices);
+
   // 글자(A/B/C/D)마다 가장 좋은 등급 하나만 남깁니다.
   // Neural2에 D가 없으므로 Wavenet-D가 D의 대표가 되는 식입니다.
   const bestOfLetter = new Map<string, { name: string; tier: number }>();
@@ -258,19 +289,39 @@ export function VoiceSettings() {
   const [selected, setSelected] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [openFolded, setOpenFolded] = useState(false);
+  /** 서버가 알려 준 기본 목소리. 어느 회사인지에 따라 달라집니다 */
+  const [defaultVoice, setDefaultVoice] = useState<string | null>(null);
 
   useEffect(() => {
-    // 고른 적이 없으면 기본 목소리가 선택된 것으로 보여 줍니다.
-    // 아무것도 안 켜져 있으면 "그럼 지금 뭘로 읽고 있지?"가 됩니다.
-    // 저장은 하지 않습니다 — 나중에 기본이 바뀌면 따라가야 하니까요.
-    setSelected(readVoice() ?? DEFAULT_VOICE);
+    /*
+      기본 목소리를 서버에 물어봅니다.
+
+      어느 회사를 쓰는지에 따라 기본값이 달라지는데(Google이면 ko-KR-…, 타입캐스트면 tc_…),
+      화면이 그걸 알 필요는 없습니다. 서버가 정해서 알려 주면 됩니다.
+
+      고른 적이 없으면 그 기본값이 선택된 것으로 보여 줍니다 —
+      아무것도 안 켜져 있으면 "그럼 지금 뭘로 읽고 있지?"가 됩니다.
+      저장은 하지 않습니다. 나중에 기본이 바뀌면 따라가야 하니까요.
+    */
+    const saved = readVoice();
+    if (saved) setSelected(saved);
+
     fetch('/api/tts/voices')
       .then((r) => (r.ok ? r.json() : { voices: [] }))
-      .then((payload: { voices?: VoiceOption[] }) => setVoices(payload.voices ?? []))
+      .then((payload: { voices?: VoiceOption[]; defaultVoice?: string | null }) => {
+        setVoices(payload.voices ?? []);
+        if (payload.defaultVoice) {
+          setDefaultVoice(payload.defaultVoice);
+          if (!saved) setSelected(payload.defaultVoice);
+        }
+      })
       .catch(() => setVoices([]));
   }, []);
 
-  const groups = useMemo(() => (voices ? buildGroups(voices) : []), [voices]);
+  const groups = useMemo(
+    () => (voices ? buildGroups(voices, defaultVoice) : []),
+    [voices, defaultVoice],
+  );
   const foldedCount = groups.filter((g) => g.folded).reduce((n, g) => n + g.rows.length, 0);
 
   // 접힌 묶음 안의 목소리를 쓰고 있으면 펼쳐 둡니다. 자기가 고른 게 안 보이면 안 됩니다.
@@ -350,7 +401,7 @@ export function VoiceSettings() {
                         <span className="flex-1">
                           <span className="flex items-center gap-1.5">
                             <span className="text-[15px] font-semibold">{row.label}</span>
-                            {row.name === DEFAULT_VOICE && (
+                            {row.name === defaultVoice && (
                               <span
                                 className="rounded px-1.5 py-0.5 text-[10px] font-bold"
                                 style={{ background: 'var(--grid-tint)', color: 'var(--grid-deep)' }}
