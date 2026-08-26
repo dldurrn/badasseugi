@@ -7,7 +7,13 @@ import { appSpeech, readRate, readVoice, writeVoice } from '@/lib/tts-app';
 /**
  * 목소리 고르기.
  *
- * 쓸 수 있는 한국어 목소리가 41개입니다. 그중 **넷만 펼쳐 두고** 나머지는 접습니다.
+ * 화면은 **어느 회사 소리를 쓰는지 모릅니다.** 서버가 목록과 기본값을 주면 그리는 일만 합니다.
+ * 서버가 이름까지 붙여 보내면(타입캐스트) 그대로 쓰고,
+ * 이름 없이 식별자만 오면(Google) 아래 규칙으로 우리가 지어 붙입니다.
+ *
+ * ─────────────────────────────────────────────────────────────
+ * 아래는 Google을 쓸 때의 이야기입니다.
+ * 쓸 수 있는 한국어 목소리가 41개라 그중 **넷만 펼쳐 두고** 나머지는 접습니다.
  *
  * 한 번 뒤집힌 판단입니다
  * 처음에는 고전 계열(Neural2/Wavenet/Standard)을 앞에 세웠습니다.
@@ -45,23 +51,16 @@ interface VoiceOption {
  *
  * 타입캐스트가 그렇습니다. 목소리에 언어 정보도, 성별도, 나이도 주지 않아서
  * 서버가 손으로 고른 목록을 이름까지 붙여 보냅니다.
- * 그럴 때는 성별로만 갈라 그대로 보여 줍니다.
+ * 지금은 여자·남자 하나씩이라 나눌 묶음도 없습니다.
  */
 function labelledGroups(voices: VoiceOption[]): Group[] {
-  const rows = (pick: (v: VoiceOption) => boolean): VoiceRow[] =>
-    voices.filter(pick).map((v) => ({ name: v.name, label: v.label ?? v.name }));
-
+  // 여자·남자 하나씩이라 묶음을 나눌 것이 없습니다. 한 줄로 세웁니다.
   return [
     {
-      key: 'labelled-f',
-      title: '여자 목소리',
-      hint: '아이가 좋아하는 목소리로 골라 주세요',
-      rows: rows((v) => v.gender === 'FEMALE'),
-    },
-    {
-      key: 'labelled-m',
-      title: '남자 목소리',
-      rows: rows((v) => v.gender !== 'FEMALE'),
+      key: 'labelled',
+      title: '',
+      hint: '아이가 듣기 편한 쪽으로 골라 주세요',
+      rows: voices.map((v) => ({ name: v.name, label: v.label ?? v.name })),
     },
   ].filter((g) => g.rows.length > 0);
 }
@@ -366,12 +365,15 @@ export function VoiceSettings() {
         if (hidden) return null;
         return (
           <div key={group.key} className="mb-4">
-            <div className="mb-1.5 flex items-baseline gap-2 px-1">
-              <span className="text-[13px] font-bold">{group.title}</span>
-              <span className="text-[11px]" style={{ color: 'var(--ink-faint)' }}>
-                {group.rows.length}개
-              </span>
-            </div>
+            {/* 묶음이 하나뿐이면 위의 「목소리」 제목과 겹치므로 이름을 안 답니다 */}
+            {group.title && (
+              <div className="mb-1.5 flex items-baseline gap-2 px-1">
+                <span className="text-[13px] font-bold">{group.title}</span>
+                <span className="text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+                  {group.rows.length}개
+                </span>
+              </div>
+            )}
             {group.hint && (
               <p className="mb-1.5 px-1 text-[11.5px]" style={{ color: 'var(--ink-soft)' }}>
                 {group.hint}

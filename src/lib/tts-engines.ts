@@ -214,33 +214,43 @@ export function pickEngine(): Engine | null {
 export const DEFAULT_GOOGLE_VOICE = 'ko-KR-Chirp3-HD-Gacrux';
 
 /**
- * 타입캐스트에서 고를 수 있게 둘 목소리.
+ * 고를 수 있는 목소리 — **여자와 남자 하나씩뿐입니다.**
+ *
+ * 열여섯을 들어 볼 수 있게 해 놓고 보니, 고르는 일이 부모에게 숙제가 됐습니다.
+ * 목소리는 한 번 정하면 다시 안 건드리는 설정이라 여럿을 늘어놓을 값어치가 없습니다.
+ * 아이가 여자 목소리를 싫어하면 남자로 바꾼다 — 그 정도면 충분합니다.
+ *
+ * 남자는 넷 중 가장 낮은 것을 골랐습니다(도현 111Hz).
+ * 「진하다」를 소리로 재는 잣대는 없지만, 기본 주파수가 낮을수록 굵게 들립니다.
  *
  * **API가 목소리에 언어 정보를 주지 않습니다.**
  * 돌려주는 필드가 voice_id, voice_name, model, emotions, voice_type 뿐이라
  * 1,125개 중 어느 것이 한국어인지 알 방법이 없습니다.
- * 그래서 한국 이름으로 후보를 추리고 실제로 읽혀 본 것만 여기 적어 둡니다.
- *
- * 새 목소리를 넣고 싶으면 여기에 한 줄 더하면 됩니다.
+ * 그래서 한국 이름으로 후보를 추리고 실제로 읽혀 본 것만 씁니다.
  */
 export const TYPECAST_VOICES = [
-  { id: 'tc_60915b5616d74069af8e8cab', name: '보미', gender: 'FEMALE' },
-  { id: 'tc_65cd94c242e2d9d9c9c905e7', name: '은하', gender: 'FEMALE' },
-  { id: 'tc_5ebea251fcf5110007b77d0f', name: '다희', gender: 'FEMALE' },
-  { id: 'tc_68785db8ba9cd7503f27d921', name: '고운', gender: 'FEMALE' },
-  { id: 'tc_660e45ff50e0ecacaf967d22', name: '은빈', gender: 'FEMALE' },
-  { id: 'tc_644a05b537254553823492fb', name: '도희', gender: 'FEMALE' },
-  { id: 'tc_6243fb7beec1a1bff3cfe6c4', name: '다솜', gender: 'FEMALE' },
-  { id: 'tc_67513c3cf30802da48949a14', name: '아린', gender: 'FEMALE' },
-  { id: 'tc_618203f635ea62f8574c7d8a', name: '보라', gender: 'FEMALE' },
-  { id: 'tc_692799c46508f6b9468c54c7', name: '다은', gender: 'FEMALE' },
-  { id: 'tc_6788847e9939d48aeb8642d2', name: '해랑', gender: 'FEMALE' },
-  { id: 'tc_609a8f4362c4bdb3363bbfad', name: '채아', gender: 'FEMALE' },
-  { id: 'tc_69fc0cff784968297fb45daa', name: '상현', gender: 'MALE' },
-  { id: 'tc_66d000ee0742c43c93a0ada1', name: '도현', gender: 'MALE' },
-  { id: 'tc_630494401f5003bebbfdafe3', name: '해준', gender: 'MALE' },
-  { id: 'tc_6596849ea3ecaa12a8b13989', name: '봉규', gender: 'MALE' },
+  { id: 'tc_60915b5616d74069af8e8cab', name: '여자 목소리', gender: 'FEMALE' },
+  { id: 'tc_66d000ee0742c43c93a0ada1', name: '남자 목소리', gender: 'MALE' },
 ] as const;
+
+/**
+ * 지금 안 쓰지만 실제로 읽혀 본 것들. 바꾸고 싶으면 위 목록의 id만 갈아 끼우면 됩니다.
+ * 괄호 안은 목소리 높이 — 낮을수록 굵고 진하게 들립니다.
+ *
+ *   여자  보미 224Hz(지금)  은하 204Hz  다희 222Hz  고운 242Hz
+ *         은빈 · 도희 · 다솜 · 아린 · 보라 · 다은 · 해랑 · 채아
+ *   남자  도현 111Hz(지금)  상현 131Hz  해준 191Hz  봉규 211Hz
+ *
+ * 해준과 봉규는 남자 이름인데 높이가 여자 범위라 소년 목소리로 보입니다.
+ *
+ *   tc_65cd94c242e2d9d9c9c905e7  은하      tc_5ebea251fcf5110007b77d0f  다희
+ *   tc_68785db8ba9cd7503f27d921  고운      tc_660e45ff50e0ecacaf967d22  은빈
+ *   tc_644a05b537254553823492fb  도희      tc_6243fb7beec1a1bff3cfe6c4  다솜
+ *   tc_67513c3cf30802da48949a14  아린      tc_618203f635ea62f8574c7d8a  보라
+ *   tc_692799c46508f6b9468c54c7  다은      tc_6788847e9939d48aeb8642d2  해랑
+ *   tc_609a8f4362c4bdb3363bbfad  채아      tc_69fc0cff784968297fb45daa  상현
+ *   tc_630494401f5003bebbfdafe3  해준      tc_6596849ea3ecaa12a8b13989  봉규
+ */
 
 /**
  * 타입캐스트 기본 목소리.
