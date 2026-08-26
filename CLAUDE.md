@@ -55,7 +55,7 @@
 ## 이미 구현되어 있는 것 (건드릴 때 주의)
 
 ### 채점 엔진 — `src/lib/grading.ts`
-**전체 194개 테스트가 통과한 상태입니다. 수정하면 반드시 `npm test`로 확인하세요.**
+**전체 209개 테스트가 통과한 상태입니다. 수정하면 반드시 `npm test`로 확인하세요.**
 
 - 편집거리(Levenshtein) 정렬로 정답과 입력을 글자 단위로 맞춥니다.
 - 역추적 시 대체(sub)를 우선해서 같은 자리 글자끼리 짝지어집니다.
@@ -77,6 +77,7 @@
 - `dictation-bank.test.ts` — 단계 구조·문장 품질 14개
 - `pin.test.ts` — PIN 해시·프로필 전환 판정 12개
 - `sets.test.ts` — 세트 입력 정규화, 한국 시간 날짜·주 계산 14개
+- `auth-messages.test.ts` — 가입·로그인 오류를 원인별로 다르게 안내하는지 15개
 
 ### 원고지 — `src/lib/wongoji.ts`, `src/components/Wongoji*.tsx`
 아이가 학교 공책처럼 **칸마다 한 글자씩** 씁니다(한 줄 15칸). 설정에서 「그냥 쓰기」로 바꿀 수 있습니다.
@@ -325,7 +326,9 @@ npx tsc --noEmit     # 타입 검사
 ## 설정 순서
 
 1. `.env.example`을 `.env.local`로 복사하고 값을 채웁니다
-2. Supabase 프로젝트를 만들고 `supabase/migrations/0001_init.sql`을 실행합니다
+2. Supabase 프로젝트를 만들고 `supabase/migrations/`의 파일을 **번호 순서대로 모두** 실행합니다
+   (`0001_init` → `0002_parent_pin` → `0003_tts_usage` → `0004_builtin_sets` → `0005_drop_spelling_bank`).
+   이미 돌아가고 있는 프로젝트라면 아직 안 돌린 번호만 실행하면 됩니다.
 3. Supabase 대시보드 > Authentication 설정
    - **URL Configuration > Redirect URLs**에 아래를 등록합니다. 여기에 없는 주소로는 되돌아오지 못합니다.
      `http://localhost:3000/auth/callback`, `https://<배포주소>/auth/callback`

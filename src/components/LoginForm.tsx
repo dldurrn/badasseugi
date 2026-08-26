@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { authMessage, isAlreadyRegistered, isUnconfirmedEmail } from '@/lib/auth-messages';
 import { createClient } from '@/lib/supabase/client';
 
 /**
@@ -17,6 +18,8 @@ import { createClient } from '@/lib/supabase/client';
  *
  * 이미 가입했지만 메일 인증을 안 끝낸 사람이 다시 가입해도 같은 자리로 옵니다.
  * 그 사람에게 정말 필요한 안내도 "메일함을 확인하세요"라서 그대로 맞습니다.
+ * **로그인이 `email_not_confirmed`로 막힌 경우에도 여기로 보냅니다** —
+ * 필요한 것이 비밀번호 다시 치기가 아니라 「메일 다시 보내기」 버튼이기 때문입니다.
  */
 type Mode = 'signin' | 'signup' | 'reset' | 'sent';
 
@@ -101,7 +104,7 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
     });
     setNotice(
       error
-        ? { kind: 'error', text: '메일을 다시 보내지 못했어요. 잠시 후 시도해 주세요.' }
+        ? { kind: 'error', text: `메일을 다시 보내지 못했어요. ${authMessage(error)}` }
         : { kind: 'info', text: '메일을 다시 보냈어요.' },
     );
     setBusy(false);
@@ -133,7 +136,7 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
       });
       setNotice(
         error
-          ? { kind: 'error', text: '메일을 보내지 못했어요. 이메일 주소를 다시 확인해 주세요.' }
+          ? { kind: 'error', text: `메일을 보내지 못했어요. ${authMessage(error)}` }
           : { kind: 'info', text: '재설정 메일을 보냈어요. 메일함을 확인해 주세요.' },
       );
       setBusy(false);
@@ -149,13 +152,17 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
         options: { emailRedirectTo: `${window.location.origin}/auth/confirmed` },
       });
       if (error) {
-        setNotice({
-          kind: 'error',
-          text:
-            password.length < 6
-              ? '비밀번호는 6자 이상으로 만들어 주세요.'
-              : '가입하지 못했어요. 이미 가입한 이메일인지 확인해 주세요.',
-        });
+        // 이미 가입한 주소면 로그인 화면으로 옮겨 줍니다.
+        // "이미 가입했어요"라고만 하면 부모가 버튼을 한 번 더 찾아야 합니다.
+        if (isAlreadyRegistered(error)) {
+          setMode('signin');
+          setConfirm('');
+          setConfirmTouched(false);
+          setNotice({ kind: 'info', text: '이미 가입한 이메일이에요. 비밀번호를 넣고 로그인해 주세요.' });
+          setBusy(false);
+          return;
+        }
+        setNotice({ kind: 'error', text: authMessage(error) });
         setBusy(false);
         return;
       }
@@ -178,7 +185,23 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
       password,
     });
     if (error) {
-      setNotice({ kind: 'error', text: '이메일 또는 비밀번호를 다시 확인해 주세요.' });
+      /*
+       * 메일 인증만 안 끝난 경우는 **비밀번호가 틀린 게 아닙니다.**
+       * 그런데 여기서 "이메일 또는 비밀번호를 확인해 주세요"라고 하면
+       * 부모는 맞는 비밀번호를 몇 번이고 다시 칩니다 — 실제로 그랬습니다.
+       * 그래서 오류를 띄우는 대신 「메일 다시 보내기」가 있는 화면으로 옮겨 줍니다.
+       */
+      if (isUnconfirmedEmail(error)) {
+        setPassword('');
+        setMode('sent');
+        setNotice({
+          kind: 'info',
+          text: '아직 메일 인증이 안 끝났어요. 메일 속 링크를 눌러 주세요.',
+        });
+        setBusy(false);
+        return;
+      }
+      setNotice({ kind: 'error', text: authMessage(error) });
       setBusy(false);
       return;
     }
