@@ -194,7 +194,7 @@ export function InlineNotePractice({
             )}
           </div>
         ) : (
-          result && <GradeSheet result={result} />
+          result && <GradeSheet result={result} wongoji={writeMode === 'wongoji'} />
         )}
 
         {note && (

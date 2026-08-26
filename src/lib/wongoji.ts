@@ -43,6 +43,17 @@ export const EMPTY = '';
 const NO_SPACE_AFTER = new Set([',', '.', '…']);
 
 /**
+ * 이 글자 뒤의 공백은 칸을 차지하지 않는가.
+ *
+ * 채점표도 원고지로 그리려면 같은 규칙을 써야 합니다.
+ * 규칙이 갈리면 아이가 쓸 때 본 칸 수와 채점표의 칸 수가 달라져,
+ * 바르게 쓰고도 "내가 뭘 잘못 썼지" 하고 세어 보게 됩니다.
+ */
+export function absorbsFollowingSpace(ch: string): boolean {
+  return NO_SPACE_AFTER.has(ch);
+}
+
+/**
  * 앞에 공백이 붙을 수 없는 글자들.
  *
  * 닫는 따옴표·괄호와 뒤따르는 부호가 여기 듭니다.
