@@ -79,7 +79,23 @@ export async function POST(request: Request) {
     result = await engine.synthesize({ text, rate, voice, gapMs });
   } catch (error) {
     console.error(`[tts] ${engine.name} 합성 실패`, error);
-    return NextResponse.json({ error: 'tts-failed' }, { status: 502 });
+
+    /*
+      공급자가 계정을 막은 경우와 잠깐 끊긴 경우를 갈라 줍니다.
+
+      예전에는 둘 다 `tts-failed`였고, 보호자 화면에는
+      "잠깐 끊긴 것일 수 있어요. 목소리를 한 번 들어 보세요"라고 떴습니다.
+      **막힌 것은 다시 눌러도 풀리지 않습니다.** 그 안내대로 하면
+      부모는 며칠을 눌러 보다 앱이 고장 났다고 생각하게 됩니다.
+
+      실제로 겪었습니다 — 타입캐스트가 403 UNUSUAL_ACTIVITY_DETECTED를 돌려주는데
+      화면은 계속 "잠깐 끊긴 것"이라고 말하고 있었습니다.
+    */
+    const blocked = error instanceof Error && /\b(401|403)\b/.test(error.message);
+    return NextResponse.json(
+      { error: blocked ? 'tts-blocked' : 'tts-failed' },
+      { status: blocked ? 403 : 502 },
+    );
   }
 
   // 사용량 기록 (실패해도 소리는 돌려줍니다)

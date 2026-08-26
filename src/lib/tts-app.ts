@@ -116,7 +116,7 @@ type FetchResult =
 const FALLBACK_KEY = 'badasseugi:tts-fallback';
 
 /** 왜 서버 음성을 못 썼는지 */
-export type FallbackReason = 'not-configured' | 'daily-limit' | 'failed';
+export type FallbackReason = 'not-configured' | 'daily-limit' | 'blocked' | 'failed';
 
 export interface FallbackNote {
   reason: FallbackReason;
@@ -261,8 +261,21 @@ async function playFromServer(
     // 잠깐 끊겼다는 이유로 남은 세션 내내 내장 음성만 쓰게 됩니다.
     serverUsable = false;
     noteFallback('not-configured');
+  } else if (result.status === 429) {
+    noteFallback('daily-limit');
+  } else if (result.status === 403) {
+    /*
+      공급자가 계정을 막았습니다. **다시 눌러도 풀리지 않습니다.**
+      이걸 「잠깐 끊김」으로 적어 두면 보호자 화면이 "한 번 들어 보세요"라고 안내하는데,
+      며칠을 눌러 봐도 그대로라 앱이 고장 난 줄 알게 됩니다.
+
+      이 세션에서는 더 시도하지 않습니다 — 어차피 안 되는 요청으로
+      문제마다 한 번씩 기다리게 만들 이유가 없습니다.
+    */
+    serverUsable = false;
+    noteFallback('blocked');
   } else {
-    noteFallback(result.status === 429 ? 'daily-limit' : 'failed');
+    noteFallback('failed');
   }
   return false;
 }

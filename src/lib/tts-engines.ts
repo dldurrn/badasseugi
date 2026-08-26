@@ -183,6 +183,14 @@ export interface Engine {
  * 타입캐스트를 앞에 둔 이유는 한국어 전용 목소리가 있어서입니다.
  * 키를 지우면 곧바로 Google로 돌아갑니다 — 되돌리기가 쉬워야 합니다.
  */
+/**
+ * 타입캐스트 무료 요금제에서 하루에 쓸 수 있는 최대 글자 수.
+ *
+ * 월 15,000자를 서른으로 나눈 값입니다.
+ * 이 위로 올리면 회사가 남용으로 보고 합성을 막아 버립니다.
+ */
+const TYPECAST_MAX_DAILY = 500;
+
 export function pickEngine(): Engine | null {
   const typecastKey = process.env.TYPECAST_API_KEY;
   if (typecastKey) {
@@ -190,8 +198,20 @@ export function pickEngine(): Engine | null {
       name: 'typecast',
       defaultVoice: process.env.TYPECAST_VOICE_ID ?? DEFAULT_TYPECAST_VOICE,
       voicePattern: /^(tc|uc)_[0-9a-f]{24}$/,
-      // 무료 한도가 월 15,000자입니다. 서른으로 나눠 하루치를 잡습니다.
-      dailyLimit: Number(process.env.TTS_DAILY_LIMIT ?? 500),
+      /*
+        무료 한도가 월 15,000자라 서른으로 나눠 하루 500자로 잡습니다.
+
+        **환경 변수로도 이 위로는 못 올립니다.**
+        `TTS_DAILY_LIMIT` 하나를 두 회사가 나눠 쓰는데 감당하는 양이 40배 다릅니다.
+        Google 기준(20,000)을 넣어 둔 채 타입캐스트로 바꾸면
+        월 한도를 하루에 넘겨 쓸 수 있게 되고, 그러면 회사가 계정을 막습니다.
+        실제로 그렇게 막혔습니다 — 합성 요청이 403 UNUSUAL_ACTIVITY_DETECTED를 받았습니다.
+        한도를 넘겨 쓰는 것보다 하루치를 다 못 쓰는 쪽이 낫습니다.
+      */
+      dailyLimit: Math.min(
+        Number(process.env.TTS_DAILY_LIMIT ?? TYPECAST_MAX_DAILY),
+        TYPECAST_MAX_DAILY,
+      ),
       synthesize: (req) => synthesizeWithTypecast(typecastKey, req),
     };
   }
