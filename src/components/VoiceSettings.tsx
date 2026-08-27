@@ -298,43 +298,48 @@ export function VoiceSettings({
   rate: SpeechRate;
 }) {
   const [voices, setVoices] = useState<VoiceOption[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  /** 방금 눌러서 바꾼 값. 아직 안 눌렀으면 null이고 그때는 props를 씁니다. */
+  const [picked, setPicked] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [openFolded, setOpenFolded] = useState(false);
   /** 서버가 알려 준 기본 목소리. 어느 회사인지에 따라 달라집니다 */
   const [defaultVoice, setDefaultVoice] = useState<string | null>(null);
 
   useEffect(() => {
-    /*
-      기본 목소리를 서버에 물어봅니다.
-
-      어느 회사를 쓰는지에 따라 기본값이 달라지는데(Google이면 ko-KR-…, 타입캐스트면 tc_…),
-      화면이 그걸 알 필요는 없습니다. 서버가 정해서 알려 주면 됩니다.
-
-      고른 적이 없으면 그 기본값이 선택된 것으로 보여 줍니다 —
-      아무것도 안 켜져 있으면 "그럼 지금 뭘로 읽고 있지?"가 됩니다.
-      저장은 하지 않습니다. 나중에 기본이 바뀌면 따라가야 하니까요.
-    */
-    const saved = value;
-    if (saved) setSelected(saved);
-
+    // 목록과 기본값은 서버가 정합니다. 화면은 어느 회사인지 몰라도 됩니다.
     fetch('/api/tts/voices')
       .then((r) => (r.ok ? r.json() : { voices: [] }))
       .then((payload: { voices?: VoiceOption[]; defaultVoice?: string | null }) => {
         setVoices(payload.voices ?? []);
-        if (payload.defaultVoice) {
-          setDefaultVoice(payload.defaultVoice);
-          if (!saved) setSelected(payload.defaultVoice);
-        }
+        setDefaultVoice(payload.defaultVoice ?? null);
       })
       .catch(() => setVoices([]));
-  }, [value]);
+  }, []);
 
   const groups = useMemo(
     () => (voices ? buildGroups(voices, defaultVoice) : []),
     [voices, defaultVoice],
   );
   const foldedCount = groups.filter((g) => g.folded).reduce((n, g) => n + g.rows.length, 0);
+
+  /*
+    **켜진 것은 상태가 아니라 계산입니다.**
+
+    예전에는 useEffect 로 props를 상태에 옮겨 담았습니다.
+    그러다 공급자가 바뀌어 저장된 이름(`tc_…`)이 지금 목록(`ko-KR-…`)에 없게 되자,
+    그 이름이 그대로 「켜진 것」에 앉아 **아무 줄과도 안 맞았습니다** —
+    동그라미 두 개가 다 빈 화면이 나왔습니다.
+    부모는 "골라 둔 게 사라졌나" 하고, 지금 뭘로 읽는지도 알 수 없습니다.
+
+    이제 매번 계산합니다. 그리고 **목록에 있는 것만** 켭니다.
+      방금 누른 것 → 저장된 것 → 서버 기본값 → 목록 첫 줄
+    마지막 갈래가 있어 목록이 비어 있지 않은 한 **언제나 하나는 켜집니다.**
+  */
+  const 있는것 = (name: string | null | undefined) =>
+    name && voices?.some((v) => v.name === name) ? name : null;
+
+  const selected =
+    있는것(picked) ?? 있는것(value) ?? 있는것(defaultVoice) ?? voices?.[0]?.name ?? null;
 
   // 접힌 묶음 안의 목소리를 쓰고 있으면 펼쳐 둡니다. 자기가 고른 게 안 보이면 안 됩니다.
   useEffect(() => {
@@ -346,7 +351,7 @@ export function VoiceSettings({
   if (!voices || voices.length === 0) return null;
 
   const choose = async (name: string) => {
-    setSelected(name);
+    setPicked(name);
     // 담아 둔 소리는 옛 목소리라 버리고, 이 화면의 미리듣기도 새 목소리로 납니다.
     setActiveVoice(name);
     // 기다리지 않습니다 — 눌린 느낌이 먼저입니다.

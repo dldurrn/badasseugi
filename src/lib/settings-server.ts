@@ -7,6 +7,7 @@ import {
   type SettingsPatch,
 } from './settings';
 import { createClient } from './supabase/server';
+import { matchVoice, pickEngines } from './tts-engines';
 
 /**
  * 지금 화면에 쓸 설정을 읽어 옵니다.
@@ -62,7 +63,30 @@ export async function readSettings(): Promise<LoadedSettings> {
     const family = fromRow(familyRes.data as Record<string, unknown> | null, 'family');
     const child = fromRow(childRes.data as Record<string, unknown> | null, 'child');
 
-    return { effective: resolveSettings(family, child), family, child };
+    /*
+      저장된 목소리를 **지금 회사의 이름으로 옮겨 둡니다.**
+
+      목소리 이름은 회사마다 형태가 다릅니다(`tc_…` / `ko-KR-…`).
+      공급자가 바뀌면 예전에 고른 이름이 지금 목록에 하나도 없게 되는데,
+      그대로 화면에 내려보내면 **아무것도 안 켜진 목록**이 나옵니다 —
+      부모는 "내가 골라 둔 게 사라졌나" 하고, 지금 뭘로 읽는지도 알 수 없습니다.
+
+      소리를 만들 때 쓰는 것과 **같은 함수**로 옮깁니다. 남녀는 지키고,
+      못 알아보면 그 회사의 기본 목소리가 됩니다. 화면과 실제 소리가 갈리지 않습니다.
+
+      저장은 하지 않습니다. 다시 타입캐스트로 돌아가면 원래 고른 목소리가 살아나야 합니다.
+    */
+    const engine = pickEngines()[0] ?? null;
+    const 옮김 = (v: string | null | undefined) =>
+      engine && v ? matchVoice(engine, v) : (v ?? null);
+
+    const resolved = resolveSettings(family, child);
+
+    return {
+      effective: { ...resolved, voice: 옮김(resolved.voice) },
+      family: { ...family, voice: 옮김(family.voice) },
+      child: { ...child, voice: 옮김(child.voice) },
+    };
   } catch (error) {
     // 칸이 아직 없으면 여기로 옵니다. 조용히 기본값으로 갑니다.
     console.error('[settings] 읽지 못했습니다', error);
