@@ -636,6 +636,28 @@
     }
   }
 
+  /*
+    설정 화면의 큰 묶음 제목.
+
+    `.section-title`과 크기가 같으면 묶은 뜻이 사라집니다 —
+    여덟 덩이가 한 줄로 늘어선 것과 다를 바가 없어집니다.
+    아래에 선을 그어 「여기부터 다른 이야기」를 눈으로 끊어 줍니다.
+  */
+  .group-title {
+    font-family: 'Gowun Batang', 'Nanum Myeongjo', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--grid-deep);
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+    border-bottom: 1.5px solid var(--grid-tint);
+  }
+
+  /* 묶음 안의 첫 항목은 제목에 바짝 붙습니다 */
+  .group-title + * {
+    margin-top: 0;
+  }
+
   .section-title {
     font-size: 13px;
     font-weight: 700;

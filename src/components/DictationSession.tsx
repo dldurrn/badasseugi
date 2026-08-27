@@ -14,7 +14,7 @@ import { appSpeech, DEFAULT_RATE, RATES, readRate, writeRate } from '@/lib/tts-a
 import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
 import { SENTENCE_MAX } from '@/lib/sets';
 import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
-import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
+import { readWriteMode, type WriteMode } from '@/lib/write-mode';
 import { GradeSheet } from './GradeSheet';
 import { NextButton } from './NextButton';
 import { WongojiInput } from './WongojiInput';
@@ -314,28 +314,27 @@ export function DictationSession({
       {/* 입력 */}
       {phase === 'writing' && (
         <>
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <label htmlFor="answer" className="text-sm" style={{ color: 'var(--ink-soft)' }}>
-              들은 문장을 써 보세요
-            </label>
-            {/*
-              세션 화면에도 두는 이유는, 막상 써 보고 불편할 때
-              화면을 빠져나가지 않고 그 자리에서 바꿀 수 있어야 하기 때문입니다.
-            */}
-            <button
-              type="button"
-              className="btn btn-quiet text-xs"
-              onClick={() => {
-                const next = writeMode === 'wongoji' ? 'plain' : 'wongoji';
-                setWriteMode(next);
-                saveWriteMode(next);
-                // 입력칸 부품이 통째로 갈리므로, 새로 그려진 뒤에 돌려줍니다.
-                refocus();
-              }}
-            >
-              {writeMode === 'wongoji' ? '그냥 쓰기' : '원고지에 쓰기'}
-            </button>
-          </div>
+          {/*
+            여기에 「그냥 쓰기 / 원고지에 쓰기」 버튼이 있었습니다. 뺐습니다.
+
+            **쓰던 중에 바꾸면 채점이 뒤집힙니다.**
+            원고지 모드에서만 쉼표 규칙을 문장으로 되돌리기 때문입니다.
+            아이가 규칙대로 「우유를 마시고,빵도 먹어요.」라고 써 놓고
+            그냥 쓰기로 바꾸면, 글자는 하나도 안 바뀌었는데 띄어쓰기를 틀렸다고 나옵니다.
+            아이는 자기가 뭘 잘못했는지 알 방법이 없습니다.
+
+            원래는 「써 보고 불편하면 그 자리에서 바꾸게」 두었던 것인데,
+            쓰기 방법은 속도와 다릅니다. 속도는 문장마다 「이건 잘 안 들려」가 있지만
+            원고지에 쓸지 말지는 그날그날 달라지지 않습니다. 한 번 정하면 그만입니다.
+            그래서 보호자 설정으로 옮겼습니다.
+          */}
+          <label
+            htmlFor="answer"
+            className="mb-2 block text-sm"
+            style={{ color: 'var(--ink-soft)' }}
+          >
+            들은 문장을 써 보세요
+          </label>
 
           {writeMode === 'wongoji' ? (
             <WongojiInput
