@@ -23,9 +23,16 @@ export default async function HomePage() {
   return (
     <main className="page">
       <header className="pb-6 pt-8 text-center">
+        {/*
+          금색이 아니라 초록입니다.
+
+          금색은 보상 전용입니다(절대 원칙 · 디자인). 앱을 열 때마다 처음 보는 색이
+          금색이면, 100점을 받았을 때의 금색이 특별할 까닭이 없어집니다.
+          여기 필요한 것은 「상」이 아니라 「제목 위의 표시」라 구조색인 초록이 맞습니다.
+        */}
         <div
           className="mx-auto mb-4 h-1 w-12 rounded-full"
-          style={{ background: 'var(--gold)' }}
+          style={{ background: 'var(--grid)' }}
         />
         <h1 className="display text-[30px] font-bold" style={{ color: 'var(--grid-deep)' }}>
           받아쓰기 공책
@@ -76,7 +83,7 @@ export default async function HomePage() {
             아이가 풀 문제를 넣어 두고, 리포트로 확인해요.
             <div className="mt-3 flex justify-center gap-2">
               <Link href="/dictation/new" className="btn btn-secondary">
-                문제 넣기
+                문제 세트 만들기
               </Link>
               <Link href="/report" className="btn btn-secondary">
                 리포트

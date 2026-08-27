@@ -4,6 +4,8 @@ import { EmptyState } from '@/components/EmptyState';
 import { MAX_CHILDREN } from '@/lib/profile';
 import { listChildren } from '@/lib/profile-server';
 
+export const metadata = { title: '프로필 만들기 · 받아쓰기 공책' };
+
 /** 프로필 만들기. 상한에 닿으면 만들 수 없는 이유와 다음 행동을 함께 보여 줍니다. */
 export default async function NewChildPage() {
   const profiles = await listChildren();

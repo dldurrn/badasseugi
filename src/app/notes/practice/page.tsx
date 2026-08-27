@@ -9,6 +9,8 @@ import { readActiveChild } from '@/lib/profile-server';
 import { isGraduated, type WrongNote } from '@/lib/review';
 import type { Module } from '@/lib/types';
 
+export const metadata = { title: '오답 이어서 풀기 · 받아쓰기 공책' };
+
 /**
  * 오답 여러 개를 몰아서 푸는 자리.
  *

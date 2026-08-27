@@ -4,6 +4,8 @@ import { EmptyState } from '@/components/EmptyState';
 import { readActiveProfile } from '@/lib/profile-server';
 import { suggestSetName } from '@/lib/sets';
 
+export const metadata = { title: '문제 세트 만들기 · 받아쓰기 공책' };
+
 /** 세트 만들기 — 보호자 화면 전용. */
 export default async function NewSetPage() {
   const { view } = await readActiveProfile();
@@ -22,7 +24,7 @@ export default async function NewSetPage() {
       ) : (
         <EmptyState
           title="보호자 화면에서 만들 수 있어요"
-          description="문제 넣기는 어른이 하는 일이에요. 프로필을 바꾸면 만들 수 있어요."
+          description="문제 세트 만들기는 어른이 하는 일이에요. 프로필을 바꾸면 만들 수 있어요."
           action={
             <Link href="/children" className="btn btn-secondary">
               프로필 바꾸기

@@ -3,6 +3,8 @@ import { EmptyState } from '@/components/EmptyState';
 import { listTrophies } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
+export const metadata = { title: '보관함 · 받아쓰기 공책' };
+
 /**
  * 보관함 — 지금까지 모은 카드와 배지.
  *
@@ -34,7 +36,7 @@ export default async function TrophiesPage() {
           description="프로필을 고르면 그 아이가 모은 카드가 보여요."
           action={
             <Link href="/children" className="btn btn-secondary">
-              프로필 고르기
+              프로필 바꾸기
             </Link>
           }
         />
@@ -44,7 +46,7 @@ export default async function TrophiesPage() {
           description="시험을 끝까지 마치고 90점을 넘기면 배지를, 100점이면 카드를 받아요."
           action={
             <Link href="/dictation" className="btn btn-primary">
-              받아쓰기 시험보기
+              받아쓰기 시험 보기
             </Link>
           }
         />

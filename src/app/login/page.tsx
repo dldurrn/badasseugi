@@ -1,5 +1,7 @@
 import { LoginForm } from '@/components/LoginForm';
 
+export const metadata = { title: '로그인 · 받아쓰기 공책' };
+
 /**
  * 로그인 화면.
  *

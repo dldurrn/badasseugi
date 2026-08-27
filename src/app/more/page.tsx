@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { ShowGuideAgain } from '@/components/ShowGuideAgain';
 import { readActiveProfile } from '@/lib/profile-server';
 
+export const metadata = { title: '더보기 · 받아쓰기 공책' };
+
 /**
  * 더보기 — 리포트와 설정 묶음.
  *
@@ -27,7 +29,7 @@ export default async function MorePage() {
     },
     {
       href: '/children',
-      name: isParent ? '프로필 고르기' : '프로필 바꾸기',
+      name: '프로필 바꾸기',
       description: isParent ? '아이 화면으로 들어가요' : '다른 사람이 쓸 때 눌러요',
     },
     {

@@ -100,8 +100,11 @@ export function ChildForm({ initial }: { initial?: ChildProfile }) {
         if (canSave) save();
       }}
     >
-      <h2 className="section-title mb-2">별명</h2>
+      <label className="section-title mb-2 block" htmlFor="nickname">
+        별명
+      </label>
       <input
+        id="nickname"
         className="field"
         value={nickname}
         onChange={(e) => setNickname(e.target.value)}

@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { SPELLING_BANK } from '@/data/spelling-bank';
 import { readActiveProfile } from '@/lib/profile-server';
 
+export const metadata = { title: '맞춤법 · 받아쓰기 공책' };
+
 const KINDS = [
   {
     kind: 'mcq' as const,
@@ -59,7 +61,7 @@ export default async function SpellingPage() {
                     href={`/spelling/${kind}?mode=exam`}
                     className="btn btn-primary flex-1 justify-center"
                   >
-                    시험보기
+                    시험 보기
                   </Link>
                 </div>
               )}

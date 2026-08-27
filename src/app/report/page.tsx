@@ -4,6 +4,8 @@ import { ERROR_LABEL, type ErrorType } from '@/lib/grading';
 import { getReport } from '@/lib/data';
 import { listChildren, readActiveProfile } from '@/lib/profile-server';
 
+export const metadata = { title: '리포트 · 받아쓰기 공책' };
+
 /**
  * 리포트 — 보호자 화면.
  *
@@ -160,8 +162,10 @@ export default async function ReportPage({
 
       <h2 className="section-title mb-2">받아쓰기 — 어디서 자주 틀릴까요</h2>
       {dictationTotal === 0 ? (
-        <p className="surface mb-6 p-5 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
+        <p className="surface mb-6 p-5 text-center text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
           아직 분석할 기록이 모이지 않았어요.
+          <br />
+          아이가 받아쓰기를 한 번 마치면 어디서 자주 틀리는지 여기에 모여요.
         </p>
       ) : (
         <ul className="surface mb-6 flex flex-col gap-3 p-4">
@@ -181,8 +185,10 @@ export default async function ReportPage({
 
       <h2 className="section-title mb-2">맞춤법 — 헷갈리는 말</h2>
       {spellingTotal === 0 ? (
-        <p className="surface mb-6 p-5 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
+        <p className="surface mb-6 p-5 text-center text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
           아직 분석할 기록이 모이지 않았어요.
+          <br />
+          아이가 맞춤법을 한 번 마치면 헷갈리는 말이 여기에 모여요.
         </p>
       ) : (
         <ul className="surface mb-6 flex flex-col gap-3 p-4">

@@ -35,6 +35,14 @@ interface NextButtonProps {
   onClick: () => void;
   children: React.ReactNode;
   className?: string;
+  /**
+   * 잠긴 동안 버튼에 띄울 말.
+   *
+   * 기본은 「정답을 보고 넘어가요」인데, 넘어가는 게 아니라 접는 자리도 있습니다 —
+   * 오답노트에서는 이 버튼이 「닫기」입니다. 거기서 「넘어가요」라고 하면
+   * 다음 문제가 나올 것처럼 들립니다.
+   */
+  holdLabel?: string;
 }
 
 export function NextButton({
@@ -42,6 +50,7 @@ export function NextButton({
   onClick,
   children,
   className = 'btn btn-primary btn-lg mt-3',
+  holdLabel = '정답을 보고 넘어가요',
 }: NextButtonProps) {
   const [left, setLeft] = useState(() => (hold ? HOLD_MS : 0));
 
@@ -72,7 +81,7 @@ export function NextButton({
       disabled={locked}
       className={className}
     >
-      {locked ? `정답을 보고 넘어가요 · ${seconds}` : children}
+      {locked ? `${holdLabel} · ${seconds}` : children}
     </button>
   );
 }

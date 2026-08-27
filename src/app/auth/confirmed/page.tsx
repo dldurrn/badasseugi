@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+export const metadata = { title: '가입 완료 · 받아쓰기 공책' };
+
 /**
  * 가입 확인이 끝났다는 것만 알리는 자리.
  *
@@ -19,9 +21,16 @@ export default function ConfirmedPage() {
   return (
     <main className="page" style={{ paddingBottom: 40 }}>
       <header className="pb-8 pt-16 text-center">
+        {/*
+          금색이 아니라 초록입니다.
+
+          금색은 보상 전용입니다(절대 원칙 · 디자인). 앱을 열 때마다 처음 보는 색이
+          금색이면, 100점을 받았을 때의 금색이 특별할 까닭이 없어집니다.
+          여기 필요한 것은 「상」이 아니라 「제목 위의 표시」라 구조색인 초록이 맞습니다.
+        */}
         <div
           className="mx-auto mb-4 h-1 w-12 rounded-full"
-          style={{ background: 'var(--gold)' }}
+          style={{ background: 'var(--grid)' }}
         />
         <h1 className="display text-[30px] font-bold" style={{ color: 'var(--grid-deep)' }}>
           가입이 끝났어요

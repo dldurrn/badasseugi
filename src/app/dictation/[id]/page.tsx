@@ -69,7 +69,7 @@ export default async function SetPage({ params }: { params: Promise<{ id: string
               </span>
             </Link>
             <Link href={`/dictation/${set.id}/play?mode=exam`} className="surface block p-4">
-              <span className="display block text-lg font-bold">시험보기</span>
+              <span className="display block text-lg font-bold">시험 보기</span>
               <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-soft)' }}>
                 끝까지 마치고 90점을 넘기면 배지, 100점이면 카드를 받아요
               </span>

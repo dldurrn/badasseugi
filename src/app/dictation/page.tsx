@@ -4,6 +4,8 @@ import { DICTATION_BANK } from '@/data/dictation-bank';
 import { builtinBestScores, listSets } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
+export const metadata = { title: '받아쓰기 · 받아쓰기 공책' };
+
 /**
  * 받아쓰기 — 세트 목록.
  *

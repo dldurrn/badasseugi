@@ -28,7 +28,7 @@ export async function DELETE(_request: Request, { params }: Params) {
 
   if (error) {
     console.error('[notes] 삭제 실패', error);
-    return NextResponse.json({ error: '지우지 못했어요.' }, { status: 500 });
+    return NextResponse.json({ error: '지우지 못했어요. 잠시 후 다시 시도해 주세요.' }, { status: 500 });
   }
   if (!data) return NextResponse.json({ error: '항목을 찾지 못했어요.' }, { status: 404 });
 

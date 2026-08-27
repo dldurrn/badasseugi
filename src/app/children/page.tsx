@@ -1,6 +1,8 @@
 import { ProfilePicker } from '@/components/ProfilePicker';
 import { isParentLocked, listChildren } from '@/lib/profile-server';
 
+export const metadata = { title: '누가 공부할까요 · 받아쓰기 공책' };
+
 /**
  * 프로필 선택 — 로그인 다음에 오는 첫 화면.
  *

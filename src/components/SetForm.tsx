@@ -375,8 +375,11 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         if (canSave) save();
       }}
     >
-      <h2 className="section-title mb-2">세트 이름</h2>
+      <label className="section-title mb-2 block" htmlFor="set-name">
+        세트 이름
+      </label>
       <input
+        id="set-name"
         className="field mb-6"
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -634,6 +637,8 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
             </span>
             <input
               className="field"
+              /* 열 칸이 모두 같은 placeholder라, 낭독기로는 몇 번째인지 알 수 없었습니다 */
+              aria-label={`${index + 1}번째 문장`}
               value={sentence}
               onChange={(e) => update(index, e.target.value)}
               maxLength={SENTENCE_MAX}

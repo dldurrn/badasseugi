@@ -6,7 +6,7 @@ import { getSet } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 import { suggestSetName } from '@/lib/sets';
 
-/** 세트 고치기 — 보호자 화면 전용. */
+/** 문제 세트 고치기 — 보호자 화면 전용. */
 export default async function EditSetPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const set = await getSet(id);
@@ -20,7 +20,7 @@ export default async function EditSetPage({ params }: { params: Promise<{ id: st
         <Link href={`/dictation/${set.id}`} className="text-sm" style={{ color: 'var(--ink-soft)' }}>
           ← {set.name}
         </Link>
-        <h1 className="display mt-3 text-2xl font-bold">세트 고치기</h1>
+        <h1 className="display mt-3 text-2xl font-bold">문제 세트 고치기</h1>
       </header>
 
       {view === 'parent' ? (

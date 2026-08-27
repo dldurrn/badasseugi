@@ -172,7 +172,7 @@ export function SpellingRunner({
                 className="btn btn-quiet mt-2 w-full justify-center"
                 onClick={() => router.push(listHref)}
               >
-                나중에 하기 (이번 기록은 지워져요)
+                나중에 하기 (이번 기록은 남지 않아요)
               </button>
             </>
           )}

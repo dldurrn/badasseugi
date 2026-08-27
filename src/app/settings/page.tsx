@@ -10,6 +10,8 @@ import { MAX_CHILDREN } from '@/lib/profile';
 import { isParentLocked, listChildren, readActiveProfile } from '@/lib/profile-server';
 import { createClient } from '@/lib/supabase/server';
 
+export const metadata = { title: '설정 · 받아쓰기 공책' };
+
 /**
  * 설정.
  *

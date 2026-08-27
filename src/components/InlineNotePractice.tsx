@@ -218,7 +218,7 @@ export function InlineNotePractice({
         )}
 
         {/* 틀렸으면 정답을 볼 틈을 줍니다. 접으면 다시 못 보니까요. */}
-        <NextButton hold={!correct} onClick={close}>
+        <NextButton hold={!correct} onClick={close} holdLabel="정답을 보고 닫아요">
           닫기
         </NextButton>
       </div>

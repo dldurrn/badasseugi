@@ -61,6 +61,7 @@ export default function PasswordPage() {
           <input
             className="field"
             type="password"
+            aria-label="새 비밀번호 (6자 이상)"
             placeholder="새 비밀번호 (6자 이상)"
             value={password}
             onChange={(e) => setPassword(e.target.value)}

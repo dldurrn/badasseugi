@@ -221,7 +221,8 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
   return (
     <main className="page" style={{ paddingBottom: 40 }}>
       <header className="pb-8 pt-16 text-center">
-        <div className="mx-auto mb-4 h-1 w-12 rounded-full" style={{ background: 'var(--gold)' }} />
+        {/* 금색은 보상 전용입니다. 여는 화면의 장식으로 쓰면 보상의 무게가 새어 나갑니다. */}
+        <div className="mx-auto mb-4 h-1 w-12 rounded-full" style={{ background: 'var(--grid)' }} />
         <h1 className="display text-[30px] font-bold" style={{ color: 'var(--grid-deep)' }}>
           {heading.title}
         </h1>
@@ -285,6 +286,7 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
           <input
             className="field"
             type="email"
+            aria-label="이메일"
             placeholder="이메일"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -296,6 +298,7 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
               <input
                 className="field"
                 type={reveal ? 'text' : 'password'}
+                aria-label={mode === 'signup' ? '비밀번호 (6자 이상)' : '비밀번호'}
                 placeholder={mode === 'signup' ? '비밀번호 (6자 이상)' : '비밀번호'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -318,6 +321,7 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
               <input
                 className="field"
                 type={reveal ? 'text' : 'password'}
+                aria-label="비밀번호 확인"
                 placeholder="비밀번호 확인"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}

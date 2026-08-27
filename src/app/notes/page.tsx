@@ -7,6 +7,8 @@ import { listWrongNotes } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 import { isGraduated } from '@/lib/review';
 
+export const metadata = { title: '오답노트 · 받아쓰기 공책' };
+
 /**
  * 오답노트 — 받아쓰기와 맞춤법을 한 곳에서.
  *
@@ -58,7 +60,7 @@ export default async function NotesPage() {
           description="프로필을 고르면 그 아이가 틀린 문제가 모여 있어요."
           action={
             <Link href="/children" className="btn btn-secondary">
-              프로필 고르기
+              프로필 바꾸기
             </Link>
           }
         />
