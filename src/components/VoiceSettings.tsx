@@ -69,6 +69,17 @@ function labelledGroups(voices: VoiceOption[]): Group[] {
 
 const SAMPLE = '나는 학교에 갔어요.';
 
+/**
+ * 회사 이름은 영어 그대로 씁니다.
+ *
+ * 「타입캐스트」로 적으면 부모가 검색해 볼 때 안 나옵니다 —
+ * 요금제를 보러 가거나 지원에 물어볼 때 쓰는 이름은 영어 쪽입니다.
+ */
+const ENGINE_LABEL: Record<string, string> = {
+  typecast: 'Typecast',
+  google: 'Google',
+};
+
 /** 고전 계열 이름 형태: ko-KR-Neural2-A 처럼 계열과 글자로 끝납니다. */
 const CLASSIC = /^ko-KR-(Neural2|Wavenet|Standard)-([A-Z])$/;
 
@@ -304,14 +315,17 @@ export function VoiceSettings({
   const [openFolded, setOpenFolded] = useState(false);
   /** 서버가 알려 준 기본 목소리. 어느 회사인지에 따라 달라집니다 */
   const [defaultVoice, setDefaultVoice] = useState<string | null>(null);
+  /** 지금 소리를 만드는 회사. 보호자 화면에만 밝힙니다. */
+  const [engine, setEngine] = useState<string | null>(null);
 
   useEffect(() => {
     // 목록과 기본값은 서버가 정합니다. 화면은 어느 회사인지 몰라도 됩니다.
     fetch('/api/tts/voices')
       .then((r) => (r.ok ? r.json() : { voices: [] }))
-      .then((payload: { voices?: VoiceOption[]; defaultVoice?: string | null }) => {
+      .then((payload: { voices?: VoiceOption[]; defaultVoice?: string | null; engine?: string | null }) => {
         setVoices(payload.voices ?? []);
         setDefaultVoice(payload.defaultVoice ?? null);
+        setEngine(payload.engine ?? null);
       })
       .catch(() => setVoices([]));
   }, []);
@@ -367,6 +381,25 @@ export function VoiceSettings({
   return (
     <>
       <h2 className="section-title mb-2">목소리</h2>
+
+      {/*
+        지금 어느 회사 소리인지 한 줄로 밝힙니다 — **보호자에게만.**
+
+        회사가 바뀌면 목소리 느낌이 달라집니다. 그런데 화면에는 아무 표시가 없어서
+        「소리가 왜 이래졌지」의 답을 찾을 길이 없었습니다.
+        예전에는 목소리 이름 아래 `tc_60915b…` 같은 글자가 작게 있었지만
+        그건 읽을 수 있는 글이 아닙니다.
+
+        아이에게는 안 보입니다. 아이가 알아야 할 것은 소리가 나느냐지
+        어느 회사냐가 아니고, 회사 이름은 아이 화면에서 낯선 영어 낱말일 뿐입니다.
+      */}
+      {scope === 'family' && engine && (
+        <p className="mb-2 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+          지금{' '}
+          <b style={{ color: 'var(--ink-soft)' }}>{ENGINE_LABEL[engine] ?? engine}</b>
+          로 읽고 있어요
+        </p>
+      )}
 
       {/*
         접힌 묶음을 한 번에 펼칩니다.
@@ -433,13 +466,11 @@ export function VoiceSettings({
                               </span>
                             )}
                           </span>
-                          {/* 어느 목소리인지 서로 이야기할 일이 있어 원래 이름도 작게 남깁니다. */}
-                          <span
-                            className="block text-[10.5px]"
-                            style={{ color: 'var(--ink-faint)' }}
-                          >
-                            {row.name.replace('ko-KR-', '')}
-                          </span>
+                          {/*
+                            여기에 원래 이름(`tc_60915b…` / `Chirp3-HD-Gacrux`)을
+                            작게 적어 두었습니다. 뺐습니다 — 부모가 읽을 수 있는 글이 아니고,
+                            어느 회사 소리인지는 위에 한 줄로 밝히는 편이 낫습니다.
+                          */}
                         </span>
                         <span className="shrink-0 text-xs" style={{ color: 'var(--ink-faint)' }}>
                           {playing === row.name ? '들려주는 중…' : '눌러서 듣기'}
