@@ -191,7 +191,79 @@ export interface Engine {
  */
 const TYPECAST_MAX_DAILY = 500;
 
+/* ------------------------------------------------------------------ */
+/* 막힌 회사 기억하기                                                    */
+/*                                                                     */
+/* 공급자가 계정을 막으면(401·403) 그 회사는 한동안 다시 물어도 소용없습니다. */
+/* 문장마다 한 번씩 헛걸음을 하면 아이가 「문장 듣기」를 누를 때마다        */
+/* 그만큼 기다립니다. 한 번 막힌 걸 알면 잠시 건너뜁니다.                  */
+/*                                                                     */
+/* 영원히 기억하지는 않습니다 — 요금제를 올리거나 다음 달이 되면 풀리는데,   */
+/* 그때 서버를 다시 띄워야 돌아온다면 그것도 곤란합니다.                   */
+/* ------------------------------------------------------------------ */
+
+const BLOCK_MEMORY_MS = 10 * 60_000;
+const blockedUntil = new Map<EngineName, number>();
+
+export function markBlocked(name: EngineName): void {
+  blockedUntil.set(name, Date.now() + BLOCK_MEMORY_MS);
+}
+
+export function isBlocked(name: EngineName): boolean {
+  return (blockedUntil.get(name) ?? 0) > Date.now();
+}
+
+/** 오류 글에서 「막힘」을 가려냅니다. 일시적 실패와 달리 다시 눌러도 안 풀립니다. */
+export function looksBlocked(error: unknown): boolean {
+  return error instanceof Error && /\b(401|403)\b/.test(error.message);
+}
+
+/**
+ * 고른 목소리를 이 회사의 목소리로 옮깁니다.
+ *
+ * 회사가 바뀌면 목소리 이름의 형태도 바뀝니다(`tc_…` vs `ko-KR-…`).
+ * 그냥 기본값으로 돌려보내면, **「남자 목소리」로 해 둔 집이
+ * 어느 날 말없이 여자 목소리를 듣게 됩니다.** 아이는 갑자기 다른 사람이
+ * 문제를 읽어 주는 것이고, 부모는 자기가 뭘 잘못 눌렀나 싶습니다.
+ *
+ * 두 회사 목록 모두 여자·남자 한 쌍이라, **남녀만 맞춰 옮기면 됩니다.**
+ */
+export function matchVoice(engine: Engine, requested: unknown): string {
+  if (typeof requested !== 'string' || requested.length === 0) return engine.defaultVoice;
+  if (engine.voicePattern.test(requested)) return requested;
+
+  const 목록 = engine.name === 'typecast' ? TYPECAST_VOICES : GOOGLE_VOICES;
+  const 저쪽 = engine.name === 'typecast' ? GOOGLE_VOICES : TYPECAST_VOICES;
+
+  const 성별 = 저쪽.find((v) => v.id === requested)?.gender;
+  return 목록.find((v) => v.gender === 성별)?.id ?? engine.defaultVoice;
+}
+
+/**
+ * 쓸 수 있는 회사를 **좋아하는 순서대로** 돌려줍니다.
+ *
+ * 타입캐스트가 앞인 이유는 한국어 전용 목소리가 있어서입니다.
+ * 다만 막힌 것으로 기억된 회사는 뒤로 미룹니다 —
+ * **아이 화면에서 소리가 나는 것이 어느 회사냐보다 중요합니다.**
+ *
+ * 예전에는 하나만 골라 돌려줬습니다. 그래서 타입캐스트가 막히자
+ * Google 키가 멀쩡히 있는데도 브라우저 내장 음성으로 떨어졌고,
+ * 사람이 환경 변수를 지워 줄 때까지 며칠이 그대로 갔습니다.
+ */
+export function pickEngines(): Engine[] {
+  const all = [typecastEngine(), googleEngine()].filter((e): e is Engine => e !== null);
+  const 쓸수있는 = all.filter((e) => !isBlocked(e.name));
+  const 막힌 = all.filter((e) => isBlocked(e.name));
+  // 막힌 회사도 맨 뒤에 남겨 둡니다. 둘 다 막혔으면 그래도 한 번은 던져 봐야 합니다.
+  return [...쓸수있는, ...막힌];
+}
+
+/** 지금 쓰는 회사 하나. 목소리 목록처럼 「누구냐」만 필요한 곳에서 씁니다. */
 export function pickEngine(): Engine | null {
+  return pickEngines()[0] ?? null;
+}
+
+function typecastEngine(): Engine | null {
   const typecastKey = process.env.TYPECAST_API_KEY;
   if (typecastKey) {
     return {
@@ -215,7 +287,10 @@ export function pickEngine(): Engine | null {
       synthesize: (req) => synthesizeWithTypecast(typecastKey, req),
     };
   }
+  return null;
+}
 
+function googleEngine(): Engine | null {
   const googleKey = process.env.GOOGLE_TTS_API_KEY;
   if (googleKey) {
     return {
@@ -226,7 +301,6 @@ export function pickEngine(): Engine | null {
       synthesize: (req) => synthesizeWithGoogle(googleKey, req),
     };
   }
-
   return null;
 }
 
@@ -251,6 +325,28 @@ export const DEFAULT_GOOGLE_VOICE = 'ko-KR-Chirp3-HD-Gacrux';
 export const TYPECAST_VOICES = [
   { id: 'tc_60915b5616d74069af8e8cab', name: '여자 목소리', gender: 'FEMALE' },
   { id: 'tc_66d000ee0742c43c93a0ada1', name: '남자 목소리', gender: 'MALE' },
+] as const;
+
+/**
+ * Google도 손으로 고른 둘만 보여 줍니다.
+ *
+ * Google은 언어로 걸러 주기 때문에 목록을 그대로 낼 수도 있습니다.
+ * 그런데 한국어 Chirp3만 41개이고 이름이 `ko-KR-Chirp3-HD-Achernar` 꼴이라,
+ * **부모가 무엇을 고르는지 알 수 없습니다.** 한 번 정하면 그만인 설정에
+ * 41개를 늘어놓는 것은 고르라는 게 아니라 포기하라는 것에 가깝습니다.
+ * 타입캐스트에서 이미 여자·남자 둘로 줄였는데, 회사가 바뀌었다고
+ * 다시 41개가 되면 같은 설정 화면이 날마다 달라 보입니다.
+ *
+ * 고른 근거 — 같은 문장을 읽혀 기본 주파수를 쟀습니다(낮을수록 굵습니다).
+ *   여자  Gacrux — 30개 중 흔들림이 가장 작고 speakingRate를 제대로 따릅니다
+ *   남자  Charon 141Hz — 남자로 표시된 16개 중 가장 낮습니다
+ *         (Algenib 146 · Iapetus 157 · Orus 190 · Achird 202)
+ *         Enceladus는 남자로 표시돼 있지만 224Hz라 여자 목소리로 들립니다 —
+ *         라벨만 믿지 말고 재 보라는 자취로 남겨 둡니다.
+ */
+export const GOOGLE_VOICES = [
+  { id: 'ko-KR-Chirp3-HD-Gacrux', name: '여자 목소리', gender: 'FEMALE' },
+  { id: 'ko-KR-Chirp3-HD-Charon', name: '남자 목소리', gender: 'MALE' },
 ] as const;
 
 /**

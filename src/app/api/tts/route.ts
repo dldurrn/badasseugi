@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server';
 import { badRequest, readJson, requireUser } from '@/lib/api';
-import { pickEngine } from '@/lib/tts-engines';
+import {
+  looksBlocked,
+  matchVoice,
+  markBlocked,
+  pickEngines,
+  type Engine,
+} from '@/lib/tts-engines';
 
 /**
  * 문장을 소리로 바꿔 돌려줍니다.
@@ -10,6 +16,9 @@ import { pickEngine } from '@/lib/tts-engines';
  *
  * 어느 회사를 쓸지는 `lib/tts-engines.ts`가 환경 변수를 보고 정합니다.
  * 이 파일은 회사가 무엇인지 몰라도 됩니다 — 로그인 확인, 하루 한도, 응답만 맡습니다.
+ *
+ * **한 회사가 막히면 다음 회사로 넘어갑니다.** 아이 화면에서 소리가 나는 것이
+ * 어느 회사 소리냐보다 중요합니다. 둘 다 안 되면 그때 브라우저 내장 음성입니다.
  *
  * 키가 하나도 없으면 503을 돌려줍니다. 화면은 그때 브라우저 내장 음성으로 넘어갑니다.
  */
@@ -26,8 +35,8 @@ interface Body {
 }
 
 export async function POST(request: Request) {
-  const engine = pickEngine();
-  if (!engine) {
+  const engines = pickEngines();
+  if (engines.length === 0) {
     // 화면이 조용히 브라우저 음성으로 넘어가도록 이유를 담아 보냅니다.
     return NextResponse.json({ error: 'tts-not-configured' }, { status: 503 });
   }
@@ -47,13 +56,6 @@ export async function POST(request: Request) {
   const rawRate = typeof body.rate === 'number' ? body.rate : 1;
   const rate = Math.min(2, Math.max(0.5, rawRate));
 
-  // 다른 회사의 목소리 이름이 남아 있을 수 있어(공급자를 바꾸면 그렇습니다)
-  // 형태가 맞지 않으면 조용히 기본값으로 돌아갑니다.
-  const voice =
-    typeof body.voice === 'string' && engine.voicePattern.test(body.voice)
-      ? body.voice
-      : engine.defaultVoice;
-
   const rawGap = typeof body.gapMs === 'number' ? body.gapMs : 0;
   const gapMs = Math.min(2000, Math.max(0, rawGap));
 
@@ -68,34 +70,46 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const usedToday = (usage?.chars as number | undefined) ?? 0;
-  if (usedToday >= engine.dailyLimit) {
-    // 막지 않고 브라우저 음성으로 넘깁니다. 아이 화면에서 소리가 아예 안 나는 것보다 낫습니다.
-    return NextResponse.json({ error: 'tts-daily-limit' }, { status: 429 });
+
+  /* 합성 — 안 되면 다음 회사로 -------------------------------------------
+     아이 화면에서 **소리가 나는 것**이 어느 회사냐보다 중요합니다.
+     한 회사가 막혀도 다른 키가 살아 있으면 그쪽으로 읽어 줍니다.
+     예전에는 회사 하나만 고르고 끝이라, 타입캐스트가 막히자
+     Google 키가 멀쩡한데도 브라우저 내장 음성으로 떨어졌습니다.        */
+  let result: Awaited<ReturnType<Engine['synthesize']>> | null = null;
+  let served: Engine | null = null;
+  /* 마지막으로 무엇 때문에 못 했는지. 화면은 이걸 보고 부모에게 알립니다. */
+  let reason: 'daily-limit' | 'blocked' | 'failed' = 'failed';
+
+  for (const engine of engines) {
+    if (usedToday >= engine.dailyLimit) {
+      reason = 'daily-limit';
+      continue;
+    }
+
+    // 다른 회사의 목소리 이름이 남아 있을 수 있습니다(공급자가 바뀌면 그렇습니다).
+    // 남녀는 지켜서 옮기고, 못 알아보면 그때 기본 목소리로 갑니다.
+    const voice = matchVoice(engine, body.voice);
+
+    try {
+      result = await engine.synthesize({ text, rate, voice, gapMs });
+      served = engine;
+      break;
+    } catch (error) {
+      console.error(`[tts] ${engine.name} 합성 실패`, error);
+      if (looksBlocked(error)) {
+        // 막힌 회사는 한동안 건너뜁니다. 문장마다 헛걸음하면 아이가 그만큼 기다립니다.
+        markBlocked(engine.name);
+        reason = 'blocked';
+      } else {
+        reason = 'failed';
+      }
+    }
   }
 
-  /* 합성 ------------------------------------------------------------------ */
-  let result;
-  try {
-    result = await engine.synthesize({ text, rate, voice, gapMs });
-  } catch (error) {
-    console.error(`[tts] ${engine.name} 합성 실패`, error);
-
-    /*
-      공급자가 계정을 막은 경우와 잠깐 끊긴 경우를 갈라 줍니다.
-
-      예전에는 둘 다 `tts-failed`였고, 보호자 화면에는
-      "잠깐 끊긴 것일 수 있어요. 목소리를 한 번 들어 보세요"라고 떴습니다.
-      **막힌 것은 다시 눌러도 풀리지 않습니다.** 그 안내대로 하면
-      부모는 며칠을 눌러 보다 앱이 고장 났다고 생각하게 됩니다.
-
-      실제로 겪었습니다 — 타입캐스트가 403 UNUSUAL_ACTIVITY_DETECTED를 돌려주는데
-      화면은 계속 "잠깐 끊긴 것"이라고 말하고 있었습니다.
-    */
-    const blocked = error instanceof Error && /\b(401|403)\b/.test(error.message);
-    return NextResponse.json(
-      { error: blocked ? 'tts-blocked' : 'tts-failed' },
-      { status: blocked ? 403 : 502 },
-    );
+  if (!result || !served) {
+    const status = reason === 'daily-limit' ? 429 : reason === 'blocked' ? 403 : 502;
+    return NextResponse.json({ error: `tts-${reason}` }, { status });
   }
 
   // 사용량 기록 (실패해도 소리는 돌려줍니다)

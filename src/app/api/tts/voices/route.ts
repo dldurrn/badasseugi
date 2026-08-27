@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api';
-import { pickEngine, TYPECAST_VOICES } from '@/lib/tts-engines';
+import { GOOGLE_VOICES, pickEngine, TYPECAST_VOICES } from '@/lib/tts-engines';
 
 /**
  * 이 계정에서 쓸 수 있는 한국어 목소리 목록.
  *
- * 회사마다 사정이 다릅니다.
- * - Google: 목록을 물어보면 언어별로 걸러서 줍니다. 목소리가 늘고 줄어도 코드를 안 고쳐도 됩니다.
- * - 타입캐스트: **언어 정보를 주지 않습니다.** 1,125개를 통째로 줄 뿐이라
- *   어느 것이 한국어인지 알 수가 없습니다. 그래서 손으로 고른 목록을 씁니다.
+ * **회사가 무엇이든 여자·남자 둘만 냅니다.** 손으로 고른 목록입니다.
+ *
+ * 타입캐스트는 언어 정보를 아예 주지 않아 1,125개 중 한국어를 가릴 방법이 없고,
+ * Google은 걸러 주긴 하지만 한국어 Chirp3만 41개에 이름이 `ko-KR-Chirp3-HD-Achernar` 꼴입니다.
+ * 사정은 다르지만 부모가 겪는 것은 같습니다 — 무엇을 고르는지 알 수 없다는 것.
+ * 고른 근거는 `tts-engines.ts`의 두 목록에 적어 두었습니다.
  *
  * 화면은 어느 회사인지 모른 채 `{ name, label, gender }`만 받습니다.
  */
-
-const GOOGLE_ENDPOINT = 'https://texttospeech.googleapis.com/v1/voices?languageCode=ko-KR';
 
 export interface VoiceOption {
   /** 합성할 때 그대로 되돌려 보낼 식별자 */
@@ -31,33 +31,22 @@ export async function GET() {
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
 
-  if (engine.name === 'typecast') {
-    return NextResponse.json({
-      engine: 'typecast',
-      defaultVoice: engine.defaultVoice,
-      voices: TYPECAST_VOICES.map((v) => ({ name: v.id, label: v.name, gender: v.gender })),
-    });
-  }
+  /*
+    회사가 무엇이든 **여자·남자 둘만** 보여 줍니다.
 
-  try {
-    const response = await fetch(`${GOOGLE_ENDPOINT}&key=${process.env.GOOGLE_TTS_API_KEY}`);
-    if (!response.ok) {
-      console.error('[tts] 목소리 목록 실패', response.status);
-      return NextResponse.json({ voices: [], engine: 'google', defaultVoice: engine.defaultVoice });
-    }
+    Google은 언어로 걸러 주니 목록을 그대로 낼 수도 있습니다.
+    그런데 한국어 Chirp3만 41개이고 이름이 `ko-KR-Chirp3-HD-Achernar` 꼴이라,
+    부모가 무엇을 고르는지 알 수 없습니다. 한 번 정하면 그만인 설정이라
+    고를 거리를 늘리는 것이 도움이 되지 않습니다.
 
-    const payload = (await response.json()) as {
-      voices?: Array<{ name?: string; ssmlGender?: string }>;
-    };
-
-    const voices: VoiceOption[] = (payload.voices ?? [])
-      .filter((v): v is { name: string; ssmlGender?: string } => typeof v.name === 'string')
-      .map((v) => ({ name: v.name, gender: v.ssmlGender ?? 'NEUTRAL' }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
-    return NextResponse.json({ voices, engine: 'google', defaultVoice: engine.defaultVoice });
-  } catch (error) {
-    console.error('[tts] 목소리 목록 실패', error);
-    return NextResponse.json({ voices: [], engine: 'google', defaultVoice: engine.defaultVoice });
-  }
+    무엇보다 **회사가 바뀌었다고 설정 화면이 달라 보이면 안 됩니다.**
+    타입캐스트가 막혀 Google로 넘어간 날, 부모에게는 목소리가
+    둘에서 마흔하나로 늘어난 것으로 보일 테니까요.
+  */
+  const list = engine.name === 'typecast' ? TYPECAST_VOICES : GOOGLE_VOICES;
+  return NextResponse.json({
+    engine: engine.name,
+    defaultVoice: engine.defaultVoice,
+    voices: list.map((v) => ({ name: v.id, label: v.name, gender: v.gender })),
+  });
 }
