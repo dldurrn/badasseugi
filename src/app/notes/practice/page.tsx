@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { SPELLING_BANK } from '@/data/spelling-bank';
 import { listWrongNotes } from '@/lib/data';
 import { readActiveChild } from '@/lib/profile-server';
+import { readSettings } from '@/lib/settings-server';
 import { isGraduated, type WrongNote } from '@/lib/review';
 import type { Module } from '@/lib/types';
 
@@ -35,7 +36,7 @@ export default async function NotesPracticePage({
   const { module: rawModule, r } = await searchParams;
   const module: Module = rawModule === 'spelling' ? 'spelling' : 'dictation';
 
-  const child = await readActiveChild();
+  const [child, settings] = await Promise.all([readActiveChild(), readSettings()]);
   if (!child) redirect('/children');
 
   const pool = pickPool(await listWrongNotes(child.id, module));
@@ -95,6 +96,7 @@ export default async function NotesPracticePage({
       /* "한 번 더 풀기"가 붙이는 r 값이 바뀌어야 새 세션으로 다시 만들어집니다. */
       key={`notes-dictation-${r ?? 'first'}`}
       childId={child.id}
+      settings={settings.effective}
       items={pool.map((n) => ({ refId: n.refId, sentence: n.content }))}
       mode="practice"
       title="받아쓰기 오답 연습"

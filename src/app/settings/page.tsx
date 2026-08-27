@@ -9,42 +9,67 @@ import { VoiceSettings } from '@/components/VoiceSettings';
 import { WriteModeSettings } from '@/components/WriteModeSettings';
 import { MAX_CHILDREN } from '@/lib/profile';
 import { isParentLocked, listChildren, readActiveProfile } from '@/lib/profile-server';
+import { DEFAULT_SETTINGS, cleanRate, cleanWriteMode } from '@/lib/settings';
+import { readSettings } from '@/lib/settings-server';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = { title: '설정 · 받아쓰기 공책' };
 
 /**
- * 설정 — **보호자 화면에만 있습니다.**
+ * 설정 — 부모와 아이가 **같은 화면을 다르게 씁니다.**
  *
- * 예전에는 아이도 이 화면에 들어왔고, 앞의 세 덩이(효과음·읽는 속도·쓰기 방법)를
- * 부모와 똑같이 봤습니다. 그래서 「아이 설정」이 「부모 설정의 앞부분」처럼 보였습니다.
+ *   부모 — 기본값을 정합니다. 아이가 따로 안 골랐으면 이걸 씁니다.
+ *   아이 — 자기 것을 고릅니다. 고르는 순간 부모 기본값에서 벗어납니다.
  *
- * 가르는 기준을 하나로 두었습니다 —
- * **지금 그 자리에서 바꾸는 것은 아이에게, 한 번 정해 두는 것은 부모에게.**
+ * 값은 **서버에 둡니다**(0006_settings.sql). 예전에는 기기 한 곳에 통으로 저장해
+ * 아이가 둘이면 한 값을 같이 썼고, 부모 휴대폰에서 정한 것이 아이 패드로 넘어가지 않았습니다.
  *
- * - 읽는 속도는 세션 화면에 크게 있고 거기서 바꾸면 기억됩니다.
- *   설정에 또 두면 같은 것이 두 곳에 있어 어느 쪽이 진짜인지 헷갈립니다.
- * - 쓰기 방법은 아이가 만질 물건이 아닙니다. 쓰던 중에 바꾸면 채점이 뒤집힙니다
- *   (원고지 모드에서만 쉼표 규칙을 되돌리기 때문입니다).
- * - 효과음만 아이 몫으로 남겨 더보기에 스위치 하나로 두었습니다.
- *   아이가 설정에서 할 일이 그것 하나뿐인데 화면을 한 번 더 들어가게 할 이유가 없습니다.
+ * 효과음만 기기에 그대로 둡니다 — 「지금 조용히 해야 하나」는
+ * 아이의 성향이 아니라 그 순간의 사정이라 기기를 따라가는 편이 맞습니다.
  *
- * 안에서도 두 덩이로 나눕니다 — **아이가 푸는 방식**과 **집 관리**.
+ * 보호자 쪽은 두 덩이로 나눕니다 — **아이가 푸는 방식**과 **집 관리**.
  * 여덟 덩이가 한 줄로 늘어서 있으면 뭘 찾으러 왔는지 잊게 됩니다.
  */
 export default async function SettingsPage() {
-  const { view } = await readActiveProfile();
+  const { view, child } = await readActiveProfile();
 
-  // 아이 화면에서 주소를 직접 쳐도 들어오지 못합니다. 여기에 아이가 볼 것은 없습니다.
-  if (view !== 'parent') redirect('/more');
+  /*
+    아이도 이 화면에 들어옵니다 — 다만 **자기 것만** 봅니다.
 
-  const [profiles, parentLocked, email] = await Promise.all([
+    한 번 뒤집힌 판단입니다. 처음에는 아이가 바꿀 것이 효과음 하나뿐이라
+    화면을 없애고 더보기에 스위치로 뒀습니다.
+    그런데 아이가 여럿이면 목소리와 쓰기 방법도 아이마다 달라야 한다는 것이 분명해졌습니다 —
+    형은 남자 목소리를, 동생은 원고지 대신 그냥 쓰기를 쓸 수 있어야 합니다.
+    바꿀 것이 셋이 되니 화면 하나가 다시 값을 합니다. 목소리 고르기는 특히 길어서
+    더보기에 그냥 붙이면 다른 항목이 다 밀립니다.
+
+    부모와 아이가 **같은 화면을 다르게 씁니다.**
+      부모 — 기본값을 정합니다. 아이가 안 골랐으면 이걸 씁니다.
+      아이 — 자기 것을 고릅니다. 고르는 순간 부모 기본값에서 벗어납니다.
+  */
+  if (view === 'child') return <ChildSettings childName={child?.nickname ?? null} />;
+  if (view !== 'parent') redirect('/children');
+
+  const [profiles, parentLocked, email, settings] = await Promise.all([
     listChildren(),
     isParentLocked(),
     createClient()
       .then((c) => c.auth.getUser())
       .then(({ data }) => data.user?.email ?? null),
+    readSettings(),
   ]);
+
+  /*
+    보호자 화면에서 고치는 것은 **기본값**입니다.
+    아이가 자기 화면에서 따로 고르면 그 아이는 자기 것을 씁니다.
+
+    그래서 여기 켜져 보이는 값은 「지금 이 아이에게 적용된 값」이 아니라
+    「내가 정해 둔 기본값」입니다. 안 정했으면 앱 기본값을 켜서 보여 줍니다 —
+    아무것도 안 켜져 있으면 「그럼 지금 뭘로 읽지?」가 됩니다.
+  */
+  const 기본속도 = cleanRate(settings.family.rate) ?? DEFAULT_SETTINGS.rate;
+  const 기본쓰기 = cleanWriteMode(settings.family.writeMode) ?? DEFAULT_SETTINGS.writeMode;
+  const 기본목소리 = settings.family.voice ?? null;
 
   return (
     <main className="page">
@@ -61,12 +86,12 @@ export default async function SettingsPage() {
       {/* 소리가 기기 목소리로 새고 있으면 알립니다. 잘 나오면 아무것도 안 뜹니다. */}
       <TtsStatus />
 
-      <RateSettings />
+      <RateSettings scope="family" value={기본속도} />
 
       {/* 음성 서비스가 설정되어 있을 때만 나타납니다 */}
-      <VoiceSettings />
+      <VoiceSettings scope="family" value={기본목소리} rate={기본속도} />
 
-      <WriteModeSettings />
+      <WriteModeSettings scope="family" value={기본쓰기} />
 
       <h3 className="section-title mb-2">효과음</h3>
       <div className="mb-6">
@@ -140,6 +165,49 @@ export default async function SettingsPage() {
           <SignOutButton />
         </div>
       </div>
+    </main>
+  );
+}
+
+/**
+ * 아이가 보는 설정 — **자기 것만** 있습니다.
+ *
+ * 여기서 고르면 그 아이 것으로 저장되고, 그 순간부터 부모 기본값을 따르지 않습니다.
+ * 형제가 같은 기기를 써도 서로의 설정을 건드리지 않습니다.
+ *
+ * 켜져 보이는 값은 **지금 실제로 적용된 값**입니다 —
+ * 자기가 고른 게 있으면 그것, 없으면 부모가 정해 둔 기본값.
+ * 「내가 안 골랐음」을 굳이 드러내지 않습니다. 아이에게는 지금 뭘로 읽는지가 전부입니다.
+ *
+ * 속도는 여기 없습니다. 받아쓰기 화면에 크게 있고 거기서 바꾸면 기억됩니다 —
+ * 「이 문장 잘 안 들려」는 문제를 푸는 그 자리에서 생기는 일이라 거기가 맞습니다.
+ */
+async function ChildSettings({ childName }: { childName: string | null }) {
+  const settings = await readSettings();
+
+  return (
+    <main className="page">
+      <header className="mb-5 pt-4">
+        <h1 className="display text-2xl font-bold">설정</h1>
+        {childName && (
+          <p className="mt-1 text-sm" style={{ color: 'var(--ink-soft)' }}>
+            {childName}
+          </p>
+        )}
+      </header>
+
+      <h3 className="section-title mb-2">효과음</h3>
+      <div className="mb-6">
+        <SoundToggle />
+      </div>
+
+      <VoiceSettings
+        scope="child"
+        value={settings.effective.voice}
+        rate={settings.effective.rate}
+      />
+
+      <WriteModeSettings scope="child" value={settings.effective.writeMode} />
     </main>
   );
 }

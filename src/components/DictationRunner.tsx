@@ -8,6 +8,7 @@ import { initSfx } from '@/lib/sfx';
 import { saveSession, starNoteFactory } from '@/lib/save-session';
 import type { CompleteSessionResponse } from '@/lib/session';
 import type { Mode } from '@/lib/types';
+import type { Settings } from '@/lib/settings';
 
 /**
  * 받아쓰기 세션 + 저장 + 결과 화면.
@@ -27,6 +28,7 @@ export function DictationRunner({
   builtinSetId,
   listHref,
   retryHref,
+  settings,
   starNotes,
 }: {
   childId: string;
@@ -38,6 +40,7 @@ export function DictationRunner({
   builtinSetId?: string | null;
   listHref: string;
   retryHref: string;
+  settings: Settings;
   /** 오답노트 연습일 때만 넘깁니다 */
   starNotes?: Record<string, { streak: number; lastCorrectDate: string | null }>;
 }) {
@@ -126,6 +129,7 @@ export function DictationRunner({
       items={items}
       mode={mode}
       title={title}
+      settings={settings}
       starNoteFor={starNotes ? starNoteFactory(starNotes) : undefined}
       onComplete={complete}
       onExit={() => router.push(listHref)}

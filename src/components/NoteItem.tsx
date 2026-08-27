@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { InlineNotePractice } from './InlineNotePractice';
+import type { Settings } from '@/lib/settings';
 import { NoteDeleteButton } from './NoteDeleteButton';
 import { Stars } from './Stars';
 import type { SpellingQuestion } from '@/data/spelling-bank';
@@ -18,6 +19,7 @@ export function NoteItem({
   note,
   question,
   childId,
+  settings,
 }: {
   note: {
     id: string;
@@ -31,6 +33,7 @@ export function NoteItem({
   question?: SpellingQuestion;
   /** 자녀 모드일 때만 값이 있습니다. 없으면 풀기 버튼을 감춥니다. */
   childId: string | null;
+  settings: Settings;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -90,6 +93,7 @@ export function NoteItem({
           refId={note.refId}
           content={note.content}
           question={question}
+          settings={settings}
           onClose={() => setOpen(false)}
         />
       )}

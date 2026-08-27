@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { RATE_LABEL, SpeechController, type SpeechRate } from '@/lib/tts';
-import { appSpeech, DEFAULT_RATE, RATES, readRate, writeRate } from '@/lib/tts-app';
+import { appSpeech, RATES } from '@/lib/tts-app';
+import { saveSettings } from '@/lib/save-settings';
 
 /**
  * 읽기 속도의 기본값.
@@ -16,16 +17,22 @@ import { appSpeech, DEFAULT_RATE, RATES, readRate, writeRate } from '@/lib/tts-a
 
 const SAMPLE = '나는 학교에 갔어요.';
 
-export function RateSettings() {
-  const [rate, setRate] = useState<SpeechRate>(DEFAULT_RATE);
+export function RateSettings({
+  scope,
+  value,
+}: {
+  /** 부모가 기본값을 정하는가, 아이가 자기 것을 고르는가 */
+  scope: 'family' | 'child';
+  /** 지금 쓰고 있는 속도 (아이 것 → 부모 기본값 → 앱 기본값으로 이미 내려온 값) */
+  value: SpeechRate;
+}) {
+  const [rate, setRate] = useState<SpeechRate>(value);
   const [playing, setPlaying] = useState(false);
-
-  // 서버에서 그릴 때는 localStorage를 읽을 수 없어, 뜬 뒤에 불러옵니다.
-  useEffect(() => setRate(readRate()), []);
 
   const choose = async (next: SpeechRate) => {
     setRate(next);
-    writeRate(next);
+    // 기다리지 않습니다 — 눌린 느낌이 먼저입니다.
+    void saveSettings(scope, { rate: next });
 
     // 고르자마자 들려줍니다. 숫자보다 귀로 확인하는 편이 빠릅니다.
     setPlaying(true);

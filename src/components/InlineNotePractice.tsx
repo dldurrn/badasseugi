@@ -9,11 +9,11 @@ import { grade, type GradeResult } from '@/lib/grading';
 import { saveSession } from '@/lib/save-session';
 import { initSfx, sfx } from '@/lib/sfx';
 import { SpeechController } from '@/lib/tts';
-import { appSpeech, readRate } from '@/lib/tts-app';
+import { appSpeech, setActiveVoice } from '@/lib/tts-app';
 import type { Module } from '@/lib/types';
 import { SENTENCE_MAX } from '@/lib/sets';
 import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
-import { readWriteMode, type WriteMode } from '@/lib/write-mode';
+import type { Settings } from '@/lib/settings';
 import { WongojiInput } from './WongojiInput';
 import { WongojiSheet } from './WongojiSheet';
 
@@ -41,6 +41,8 @@ interface Props {
   /** 맞춤법일 때만. 문제은행에서 찾아 넘겨 주세요. */
   question?: SpellingQuestion;
   onClose: () => void;
+  /** 서버가 읽어 내려준 값 */
+  settings: Settings;
 }
 
 export function InlineNotePractice({
@@ -50,14 +52,14 @@ export function InlineNotePractice({
   content,
   question,
   onClose,
+  settings,
 }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('writing');
   const [typed, setTyped] = useState('');
   const [choice, setChoice] = useState<string | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
-  const [writeMode, setWriteMode] = useState<WriteMode>('wongoji');
-  useEffect(() => setWriteMode(readWriteMode()), []);
+  const writeMode = settings.writeMode;
   const [correct, setCorrect] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +73,10 @@ export function InlineNotePractice({
 
   useEffect(() => {
     initSfx();
+    setActiveVoice(settings.voice);
     inputRef.current?.focus();
     return () => speech.stop();
-  }, [speech]);
+  }, [speech, settings.voice]);
 
   /*
     받아쓰기는 채점에 넘길 문장을 여기서 만듭니다.
@@ -93,7 +96,7 @@ export function InlineNotePractice({
   const play = async (style: 'flow' | 'chunked') => {
     setSpeaking(true);
     // 설정과 세션 화면에서 정한 속도를 그대로 씁니다.
-    await speech.play(content, readRate(), style);
+    await speech.play(content, settings.rate, style);
     setSpeaking(false);
     // 듣고 나면 쓰던 자리로 돌려줍니다. 안 그러면 키보드가 내려간 채로 남습니다.
     window.setTimeout(() => inputRef.current?.focus(), 0);

@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { ShowGuideAgain } from '@/components/ShowGuideAgain';
-import { SoundToggle } from '@/components/SoundToggle';
 import { readActiveProfile } from '@/lib/profile-server';
 
 export const metadata = { title: '더보기 · 받아쓰기 공책' };
@@ -23,21 +22,13 @@ export default async function MorePage() {
       name: '보관함',
       description: '지금까지 모은 카드와 배지를 봐요',
     },
-    /*
-      설정은 보호자 화면에만 둡니다.
-
-      아이가 설정에서 바꿀 것은 효과음 하나뿐인데, 그것 하나 때문에
-      화면을 한 번 더 들어가게 할 이유가 없습니다. 아래에 스위치로 바로 둡니다.
-    */
-    ...(isParent
-      ? [
-          {
-            href: '/settings',
-            name: '설정',
-            description: '아이가 푸는 방식, 자녀 프로필, 계정',
-          },
-        ]
-      : []),
+    {
+      href: '/settings',
+      name: '설정',
+      description: isParent
+        ? '아이가 푸는 방식, 자녀 프로필, 계정'
+        : '소리와 목소리, 쓰는 방법',
+    },
     {
       href: '/children',
       name: '프로필 바꾸기',
@@ -72,15 +63,6 @@ export default async function MorePage() {
             </Link>
           </li>
         ))}
-        {/*
-          아이가 스스로 바꿀 것은 이것 하나입니다.
-          조용히 해야 할 때 아이가 직접 끌 수 있어야 하므로 여기에 둡니다.
-        */}
-        {!isParent && (
-          <li>
-            <SoundToggle />
-          </li>
-        )}
         <li>
           <ShowGuideAgain />
         </li>

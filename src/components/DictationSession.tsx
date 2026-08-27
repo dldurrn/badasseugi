@@ -10,11 +10,13 @@ import {
   type SpeechRate,
 } from '@/lib/tts';
 import { sfx } from '@/lib/sfx';
-import { appSpeech, DEFAULT_RATE, RATES, readRate, writeRate } from '@/lib/tts-app';
+import { appSpeech, RATES, setActiveVoice } from '@/lib/tts-app';
+import { saveSettings } from '@/lib/save-settings';
+import type { Settings } from '@/lib/settings';
 import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
 import { SENTENCE_MAX } from '@/lib/sets';
 import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
-import { readWriteMode, type WriteMode } from '@/lib/write-mode';
+
 import { GradeSheet } from './GradeSheet';
 import { NextButton } from './NextButton';
 import { WongojiInput } from './WongojiInput';
@@ -53,6 +55,7 @@ export function DictationSession({
   starNoteFor,
   onComplete,
   onExit,
+  settings,
 }: {
   items: SessionItem[];
   mode: Mode;
@@ -62,6 +65,8 @@ export function DictationSession({
   /** 세션을 끝까지 마쳤을 때만 호출됩니다. */
   onComplete: (outcomes: SessionOutcome[], score: number) => void;
   onExit: () => void;
+  /** 서버가 읽어 내려준 값 — 이 아이 것 → 부모 기본값 → 앱 기본값 */
+  settings: Settings;
 }) {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('writing');
@@ -70,9 +75,9 @@ export function DictationSession({
   const [result, setResult] = useState<GradeResult | null>(null);
   const [outcomes, setOutcomes] = useState<SessionOutcome[]>([]);
   // 서버에서 그릴 때는 localStorage를 읽을 수 없어 기본값으로 두고, 뜬 뒤에 저장된 값을 불러옵니다.
-  const [rate, setRate] = useState<SpeechRate>(DEFAULT_RATE);
+  const [rate, setRate] = useState<SpeechRate>(settings.rate);
   const [speaking, setSpeaking] = useState<ReadingStyle | null>(null);
-  const [writeMode, setWriteMode] = useState<WriteMode>('wongoji');
+  const writeMode = settings.writeMode;
 
   const inputRef = useRef<HTMLInputElement>(null);
   // 서버 음성을 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
@@ -87,10 +92,8 @@ export function DictationSession({
   const started = outcomes.length > 0 || typed.trim().length > 0;
   useLeaveGuard(started && !completedRef.current, LEAVE_MESSAGE);
 
-  useEffect(() => setRate(readRate()), []);
-
-  // 서버가 그린 화면과 어긋나지 않게, 저장된 쓰기 모드는 화면이 뜬 뒤에 읽습니다.
-  useEffect(() => setWriteMode(readWriteMode()), []);
+  // 소리를 만드는 자리는 화면에서 머니 목소리를 한 번 꽂아 둡니다.
+  useEffect(() => setActiveVoice(settings.voice), [settings.voice]);
 
   useEffect(() => () => speech.stop(), [speech]);
 
@@ -289,8 +292,12 @@ export function DictationSession({
               key={r}
               onClick={() => {
                 setRate(r);
-                // 다음 세션에서도 이어지도록 기억합니다.
-                writeRate(r);
+                /*
+                  다음에도 이어지도록 **이 아이 것으로** 기억합니다.
+                  형제가 같은 기기를 써도 서로의 속도를 건드리지 않습니다.
+                  기다리지 않습니다 — 눌린 느낌이 먼저입니다.
+                */
+                void saveSettings('child', { rate: r });
                 refocus();
               }}
               aria-pressed={rate === r}

@@ -1,27 +1,33 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { padToGrid, toCells } from '@/lib/wongoji';
-import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
+import { saveSettings } from '@/lib/save-settings';
+import type { WriteMode } from '@/lib/write-mode';
 import { WongojiSheet } from './WongojiSheet';
 
 /**
  * 받아쓰기를 원고지에 쓸지 한 줄에 쓸지 고릅니다.
  *
  * 글로만 설명하면 무엇이 달라지는지 모릅니다. 고른 모습을 그대로 보여 줍니다.
- * 기기별로 저장하는 것은 속도·목소리와 같습니다.
+ * 저장은 서버에 합니다 — 아이마다 다르고, 부모 기기에서 정한 것이 아이 기기로도 따라와야 합니다.
  */
 
 const SAMPLE = '눈처럼 하얗고 예쁜 집이';
 
-export function WriteModeSettings() {
-  const [mode, setMode] = useState<WriteMode>('wongoji');
-
-  useEffect(() => setMode(readWriteMode()), []);
+export function WriteModeSettings({
+  scope,
+  value,
+}: {
+  /** 부모가 기본값을 정하는가, 아이가 자기 것을 고르는가 */
+  scope: 'family' | 'child';
+  value: WriteMode;
+}) {
+  const [mode, setMode] = useState<WriteMode>(value);
 
   const choose = (next: WriteMode) => {
     setMode(next);
-    saveWriteMode(next);
+    void saveSettings(scope, { writeMode: next });
   };
 
   return (

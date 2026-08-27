@@ -5,6 +5,7 @@ import { Stars } from '@/components/Stars';
 import { SPELLING_BANK } from '@/data/spelling-bank';
 import { listWrongNotes } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
+import { readSettings } from '@/lib/settings-server';
 import { isGraduated } from '@/lib/review';
 
 export const metadata = { title: '오답노트 · 받아쓰기 공책' };
@@ -16,7 +17,7 @@ export const metadata = { title: '오답노트 · 받아쓰기 공책' };
  * 여러 개를 몰아서 풀고 싶으면 위쪽 '이어서 풀기'로 세션에 들어갑니다.
  */
 export default async function NotesPage() {
-  const { view, child } = await readActiveProfile();
+  const [{ view, child }, settings] = await Promise.all([readActiveProfile(), readSettings()]);
   const isChild = view === 'child';
 
   const notes = child ? await listWrongNotes(child.id) : [];
@@ -114,6 +115,7 @@ export default async function NotesPage() {
                 note={note}
                 question={note.module === 'spelling' ? questionFor(note.refId) : undefined}
                 childId={isChild && child ? child.id : null}
+                settings={settings.effective}
               />
             ))}
           </ul>

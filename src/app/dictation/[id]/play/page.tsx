@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { DictationRunner } from '@/components/DictationRunner';
 import { getSet } from '@/lib/data';
 import { readActiveChild } from '@/lib/profile-server';
+import { readSettings } from '@/lib/settings-server';
 import type { Mode } from '@/lib/types';
 
 /**
@@ -19,7 +20,7 @@ export default async function PlaySetPage({
 }) {
   const [{ id }, { mode: rawMode, r }] = await Promise.all([params, searchParams]);
 
-  const child = await readActiveChild();
+  const [child, settings] = await Promise.all([readActiveChild(), readSettings()]);
   if (!child) redirect('/children');
 
   const set = await getSet(id);
@@ -45,6 +46,7 @@ export default async function PlaySetPage({
       setId={set.builtin ? null : set.id}
       builtinSetId={set.builtin ? set.id : null}
       listHref={`/dictation/${set.id}`}
+      settings={settings.effective}
       retryHref={`/dictation/${set.id}/play?mode=${mode}`}
     />
   );

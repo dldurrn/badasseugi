@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { SpeechController } from '@/lib/tts';
-import { appSpeech, readRate, readVoice, writeVoice } from '@/lib/tts-app';
+import { appSpeech, setActiveVoice } from '@/lib/tts-app';
+import { saveSettings } from '@/lib/save-settings';
+import type { SpeechRate } from '@/lib/tts';
 
 /**
  * 목소리 고르기.
@@ -283,7 +285,18 @@ function buildGroups(voices: VoiceOption[], defaultVoice: string | null): Group[
   ].filter((g) => g.rows.length > 0);
 }
 
-export function VoiceSettings() {
+export function VoiceSettings({
+  scope,
+  value,
+  rate,
+}: {
+  /** 부모가 기본값을 정하는가, 아이가 자기 것을 고르는가 */
+  scope: 'family' | 'child';
+  /** 지금 이 층에 저장된 값. 안 골랐으면 null — 그때는 서버 기본값을 켜서 보여 줍니다. */
+  value: string | null;
+  /** 미리듣기에 쓸 속도 */
+  rate: SpeechRate;
+}) {
   const [voices, setVoices] = useState<VoiceOption[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -302,7 +315,7 @@ export function VoiceSettings() {
       아무것도 안 켜져 있으면 "그럼 지금 뭘로 읽고 있지?"가 됩니다.
       저장은 하지 않습니다. 나중에 기본이 바뀌면 따라가야 하니까요.
     */
-    const saved = readVoice();
+    const saved = value;
     if (saved) setSelected(saved);
 
     fetch('/api/tts/voices')
@@ -315,7 +328,7 @@ export function VoiceSettings() {
         }
       })
       .catch(() => setVoices([]));
-  }, []);
+  }, [value]);
 
   const groups = useMemo(
     () => (voices ? buildGroups(voices, defaultVoice) : []),
@@ -333,13 +346,16 @@ export function VoiceSettings() {
   if (!voices || voices.length === 0) return null;
 
   const choose = async (name: string) => {
-    writeVoice(name);
     setSelected(name);
+    // 담아 둔 소리는 옛 목소리라 버리고, 이 화면의 미리듣기도 새 목소리로 납니다.
+    setActiveVoice(name);
+    // 기다리지 않습니다 — 눌린 느낌이 먼저입니다.
+    void saveSettings(scope, { voice: name });
 
     // 고르자마자 들려줍니다. 이름만 보고는 고를 수 없습니다.
     setPlaying(name);
     const speech = new SpeechController(appSpeech);
-    await speech.play(SAMPLE, readRate(), 'flow');
+    await speech.play(SAMPLE, rate, 'flow');
     setPlaying(null);
   };
 

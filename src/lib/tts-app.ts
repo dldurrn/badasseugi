@@ -1,21 +1,10 @@
 'use client';
 
-import { browserSpeech, type SpeechProvider, type SpeechRate } from './tts';
+import { browserSpeech, DEFAULT_RATE, RATES, type SpeechProvider, type SpeechRate } from './tts';
 
-/** 화면에서 고를 수 있는 속도. 이 세 가지 말고는 저장하지 않습니다. */
-export const RATES: readonly SpeechRate[] = [0.65, 0.85, 1.0];
-/**
- * 기본 속도는 「보통」입니다.
- *
- * 예전에는 0.85(천천히)였습니다. 저학년이니 천천히가 낫겠다는 짐작이었는데,
- * 실제로 들어 보니 **늦출수록 오히려 안 들렸습니다.**
- * TTS는 속도를 낮추면 소리를 늘려 재생하는데, 마찰음(ㅅ)이 길어지면
- * 귀는 그걸 된소리(ㅆ)로 듣습니다 — 「송골」이 「쏭골」로 들리던 게 이것이었습니다.
- *
- * 천천히가 필요한 아이는 세션 화면에서 그때 누르면 됩니다.
- * 기본값은 가장 또렷한 쪽이어야 합니다.
- */
-export const DEFAULT_RATE: SpeechRate = 1.0;
+/* 속도 값은 tts.ts 가 갖습니다 — 서버(설정 읽기)에서도 써야 해서입니다.
+   여기서 다시 내보내는 것은 부르던 곳들을 그대로 두기 위해서입니다. */
+export { RATES, DEFAULT_RATE };
 
 /**
  * 이 앱이 실제로 쓰는 음성 공급자.
@@ -35,53 +24,37 @@ export const DEFAULT_RATE: SpeechRate = 1.0;
 /** 담아 둘 소리 개수. 10문장 세트 하나를 어절까지 다 담고도 남는 크기입니다. */
 const MAX_CACHE = 80;
 
-/** 설정에서 고른 목소리를 기억하는 자리 */
-export const VOICE_STORAGE_KEY = 'badasseugi:voice';
-
-/** 읽기 속도를 기억하는 자리 */
-export const RATE_STORAGE_KEY = 'badasseugi:rate';
-
-/** key = 목소리|속도|문장 */
+/** key = 목소리|속도|쉼|문장 */
 const cache = new Map<string, string>();
 
 /**
  * 서버 음성을 쓸 수 있는지.
  * null = 아직 모름 / false = 이 페이지에서는 더 시도하지 않음
  *
- * 키가 없는 경우(503)에만 false로 잠급니다.
+ * 키가 없는 경우(503)와 공급자가 막은 경우(403)에만 false로 잠급니다.
  * 일시적인 네트워크 오류로 잠가 버리면, 잠깐 끊겼다는 이유로
  * 남은 세션 내내 내장 음성만 쓰게 됩니다.
  */
 let serverUsable: boolean | null = null;
 
-export function readVoice(): string | null {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(VOICE_STORAGE_KEY);
-}
+/**
+ * 지금 쓸 목소리.
+ *
+ * 예전에는 브라우저에 저장해 두고 여기서 읽었습니다. 이제는 **서버가 갖습니다** —
+ * 아이마다 다르고, 부모 휴대폰에서 정한 것이 아이 패드로도 따라와야 하기 때문입니다.
+ * 서버 컴포넌트가 읽어 화면에 내려 주면, 화면이 뜰 때 여기에 한 번 꽂아 둡니다.
+ *
+ * 모듈 한 곳에 두는 이유는 소리를 만드는 자리가 화면에서 멀기 때문입니다 —
+ * `SpeechController.play(text, rate, style)`까지 목소리를 들고 다니게 하면
+ * 부르는 곳마다 인자가 하나씩 늘어납니다.
+ */
+let activeVoice: string | null = null;
 
-export function writeVoice(name: string | null): void {
-  if (typeof window === 'undefined') return;
-  if (name) window.localStorage.setItem(VOICE_STORAGE_KEY, name);
-  else window.localStorage.removeItem(VOICE_STORAGE_KEY);
+export function setActiveVoice(voice: string | null): void {
+  if (voice === activeVoice) return;
+  activeVoice = voice;
   // 목소리가 바뀌면 담아 둔 소리는 옛 목소리라 버립니다.
   clearVoiceCache();
-}
-
-/**
- * 읽기 속도. 세션 화면에서 바꾼 값이 다음에도 이어지도록 기억합니다.
- *
- * 아이마다 알아듣는 속도가 다른데, 매번 처음부터 다시 고르게 하면
- * 느리게 들어야 하는 아이가 세션마다 같은 버튼을 다시 눌러야 합니다.
- */
-export function readRate(): SpeechRate {
-  if (typeof window === 'undefined') return DEFAULT_RATE;
-  const raw = Number(window.localStorage.getItem(RATE_STORAGE_KEY));
-  return (RATES as readonly number[]).includes(raw) ? (raw as SpeechRate) : DEFAULT_RATE;
-}
-
-export function writeRate(rate: SpeechRate): void {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(RATE_STORAGE_KEY, String(rate));
 }
 
 export function clearVoiceCache(): void {
@@ -177,7 +150,7 @@ async function fetchAudio(
   signal: AbortSignal,
   gapMs = 0,
 ): Promise<FetchResult> {
-  const voice = readVoice();
+  const voice = activeVoice;
   // 쉼도 열쇠에 넣습니다. 이어서 읽은 소리와 또박또박 읽은 소리는 다른 소리입니다.
   const key = `${voice ?? ''}|${rate}|${gapMs}|${text}`;
 
