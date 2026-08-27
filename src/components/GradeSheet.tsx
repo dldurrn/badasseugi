@@ -190,100 +190,23 @@ function AnswerPaper({ answer }: { answer: string }) {
   );
 }
 
-function MarkColumn({
-  kind,
-  label,
-}: {
-  kind: 'vee' | 'cross';
-  label: string;
-}) {
-  return (
-    <div className="flex flex-col items-center gap-1" style={{ width: 26 }}>
-      <div style={{ height: 'var(--cell)' }} className="flex items-center justify-center">
-        <PenMark kind={kind} />
-      </div>
-      <span
-        className="rounded px-1 text-[10px] font-bold leading-tight"
-        style={{ color: 'var(--pen)', background: 'var(--pen-tint)' }}
-      >
-        {label}
-      </span>
-    </div>
-  );
-}
+/*
+  여기에 채점표가 한 벌 더 있었습니다 — 낱낱의 칸을 띄엄띄엄 늘어놓던 옛 방식.
+  원고지 채점표를 만든 뒤로 「그냥 쓰기」에서만 쓰였는데, 두 벌을 함께 고쳐야 했습니다.
 
-function ColumnPair({ column }: { column: Column }) {
-  switch (column.kind) {
-    case 'needSpace':
-      return <MarkColumn kind="vee" label="띄어요" />;
-
-    case 'extraSpace':
-      return <MarkColumn kind="cross" label="붙여요" />;
-
-    case 'same':
-      // 띄어쓰기 자리는 좁은 빈 칸으로 표현해 어절이 눈에 들어오게 함
-      if (column.answer === ' ') {
-        return <div style={{ width: 14 }} aria-hidden="true" />;
-      }
-      return (
-        <div className="flex flex-col items-center gap-1">
-          <div className="grid-cell grid-cell--mine">{column.input}</div>
-          <div className="grid-cell grid-cell--answer">{column.answer}</div>
-        </div>
-      );
-
-    case 'diff':
-      return (
-        <div className="flex flex-col items-center gap-1">
-          <div className="grid-cell grid-cell--wrong">{column.input}</div>
-          <div
-            className={`grid-cell grid-cell--focus${
-              column.error === 'batchim' ? ' grid-cell--batchim' : ''
-            }`}
-          >
-            {column.answer}
-          </div>
-        </div>
-      );
-
-    case 'missing':
-      return (
-        <div className="flex flex-col items-center gap-1">
-          <div className="grid-cell grid-cell--void" aria-label="쓰지 않음">
-            ·
-          </div>
-          <div className="grid-cell grid-cell--focus">{column.answer}</div>
-        </div>
-      );
-
-    case 'extra':
-      return (
-        <div className="flex flex-col items-center gap-1">
-          <div className="grid-cell grid-cell--wrong">{column.input}</div>
-          <div className="grid-cell grid-cell--void" aria-label="정답에 없음">
-            ·
-          </div>
-        </div>
-      );
-  }
-}
+  하나로 합쳤습니다. 원고지 채점표가 「그냥 쓰기」에도 더 낫습니다 —
+  격자는 아이가 쓴 방식이 아니라 **견주는 방식**이기 때문입니다.
+  칸이 이어져 있어야 몇째 글자에서 틀렸는지 셀 수 있고,
+  띄어쓰기가 표식이 아니라 빈 칸으로 드러납니다.
+*/
 
 export function GradeSheet({
   result,
   note,
-  wongoji = false,
 }: {
   result: GradeResult;
   /** 별 획득 안내 등 상황별 한 줄 안내 */
   note?: string | null;
-  /**
-   * 원고지로 쓴 답인가.
-   *
-   * 쓸 때 본 대로 채점표도 원고지로 그립니다.
-   * 칸 세는 법이 다르면 — 특히 쉼표 뒤 — 바르게 쓰고도
-   * 「내가 뭘 잘못 썼지」 하고 칸을 세어 보게 됩니다.
-   */
-  wongoji?: boolean;
 }) {
   if (result.correct) {
     return (
@@ -297,21 +220,7 @@ export function GradeSheet({
         >
           맞았어요
         </div>
-        {wongoji ? (
-          <AnswerPaper answer={result.answer} />
-        ) : (
-          <div className="flex flex-wrap justify-center gap-1.5">
-            {Array.from(result.answer).map((ch, i) =>
-              ch === ' ' ? (
-                <div key={i} style={{ width: 14 }} aria-hidden="true" />
-              ) : (
-                <div key={i} className="grid-cell grid-cell--answer">
-                  {ch}
-                </div>
-              ),
-            )}
-          </div>
-        )}
+        <AnswerPaper answer={result.answer} />
         {note && (
           <p
             className="mt-4 rounded-sm px-3 py-2.5 text-center text-sm"
@@ -341,15 +250,7 @@ export function GradeSheet({
         <span style={{ color: 'var(--grid)' }}>아랫줄 · 정답</span>
       </div>
 
-      {wongoji ? (
-        <GradePaper result={result} />
-      ) : (
-        <div className="flex flex-wrap items-start justify-center gap-1.5">
-          {result.columns.map((c, i) => (
-            <ColumnPair key={i} column={c} />
-          ))}
-        </div>
-      )}
+      <GradePaper result={result} />
 
       <div className="mt-5 flex flex-col gap-2">
         {result.errorTypes.map((t) => (

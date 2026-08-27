@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DictationSetCard } from '@/components/DictationSetCard';
 import { EmptyState } from '@/components/EmptyState';
 import { DICTATION_BANK } from '@/data/dictation-bank';
 import { builtinBestScores, listSets } from '@/lib/data';
@@ -21,6 +22,7 @@ export const metadata = { title: '받아쓰기 · 받아쓰기 공책' };
 export default async function DictationPage() {
   const { view, child } = await readActiveProfile();
   const isParent = view === 'parent';
+  const isChild = view === 'child';
   const childId = view === 'child' ? (child?.id ?? null) : null;
 
   const [sets, builtinBest] = await Promise.all([
@@ -60,13 +62,12 @@ export default async function DictationPage() {
         <ul className="flex flex-col gap-3">
           {sets.map((set) => (
             <li key={set.id}>
-              <Link href={`/dictation/${set.id}`} className="surface block p-4">
-                <span className="display text-lg font-bold">{set.name}</span>
-                <span className="mt-1 block text-xs" style={{ color: 'var(--ink-soft)' }}>
-                  문장 {set.count}개
-                  {set.best !== null && ` · 최고 ${set.best}점`}
-                </span>
-              </Link>
+              <DictationSetCard
+                href={`/dictation/${set.id}`}
+                name={set.name}
+                detail={`문장 ${set.count}개${set.best !== null ? ` · 최고 ${set.best}점` : ''}`}
+                isChild={isChild}
+              />
             </li>
           ))}
         </ul>
@@ -88,13 +89,14 @@ export default async function DictationPage() {
           const best = builtinBest.get(set.id);
           return (
             <li key={set.id}>
-              <Link href={`/dictation/${set.id}`} className="surface block p-4">
-                <span className="display text-base font-bold">{set.name}</span>
-                <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-soft)' }}>
-                  {set.focus} · {set.sentences.length}개
-                  {best !== undefined && ` · 최고 ${best}점`}
-                </span>
-              </Link>
+              <DictationSetCard
+                href={`/dictation/${set.id}`}
+                name={set.name}
+                detail={`${set.focus} · ${set.sentences.length}개${
+                  best !== undefined ? ` · 최고 ${best}점` : ''
+                }`}
+                isChild={isChild}
+              />
             </li>
           );
         })}

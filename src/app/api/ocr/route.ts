@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireUser } from '@/lib/api';
 
 /**
  * 문제지 사진에서 받아쓰기 문장을 추출합니다.
@@ -118,13 +118,11 @@ export async function POST(request: Request) {
   }
 
   // 로그인 확인 — 가족 단위로 사용량을 세기 위해 필요합니다.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: '로그인이 필요해요.' }, { status: 401 });
-  }
+  // 다른 라우트와 같은 함수를 씁니다. 여기만 손으로 다시 쓰면
+  // 나중에 인증 규칙이 바뀔 때 이 파일 하나가 조용히 뒤처집니다.
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
 
   // 일일 사용량 확인
   const limit = Number(process.env.OCR_DAILY_LIMIT ?? 30);

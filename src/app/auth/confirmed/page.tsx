@@ -32,7 +32,7 @@ export default function ConfirmedPage() {
           className="mx-auto mb-4 h-1 w-12 rounded-full"
           style={{ background: 'var(--grid)' }}
         />
-        <h1 className="display text-[30px] font-bold" style={{ color: 'var(--grid-deep)' }}>
+        <h1 className="display title-entry text-[30px] font-bold">
           가입이 끝났어요
         </h1>
         <p className="mt-2 text-sm" style={{ color: 'var(--ink-soft)' }}>

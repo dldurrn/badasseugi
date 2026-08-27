@@ -108,16 +108,21 @@ export default async function SettingsPage() {
         </p>
       )}
 
-      <div className="mb-6 flex gap-2">
-        {profiles.length < MAX_CHILDREN && (
-          <Link href="/children/new" className="btn btn-secondary flex-1 justify-center">
+      {/*
+        여기에 「프로필 바꾸기」도 있었습니다. 뺐습니다.
+
+        같은 곳으로 가는 길이 홈 · 더보기 · 설정 세 군데였습니다.
+        길이 많으면 편할 것 같지만, 「내가 아까 본 게 어디였지」를 만듭니다.
+        홈 위쪽에 지금 누가 쓰는지가 늘 떠 있고 거기서 바로 바꿀 수 있으며,
+        더보기에도 있습니다. 설정은 **관리하는 자리**라 추가만 남깁니다.
+      */}
+      {profiles.length < MAX_CHILDREN && (
+        <div className="mb-6">
+          <Link href="/children/new" className="btn btn-secondary btn-lg">
             프로필 추가
           </Link>
-        )}
-        <Link href="/children" className="btn btn-secondary flex-1 justify-center">
-          프로필 바꾸기
-        </Link>
-      </div>
+        </div>
+      )}
 
       <h3 className="section-title mb-2">보호자 잠금</h3>
       <div className="mb-6">

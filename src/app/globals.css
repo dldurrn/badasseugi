@@ -233,43 +233,11 @@
     flex-shrink: 0;
   }
 
-  /* 정답 줄 */
-  .grid-cell--answer {
-    background: var(--grid-tint);
-    border-color: rgba(46, 125, 91, 0.32);
-    color: var(--grid-deep);
-  }
-  /* 아이가 쓴 줄 */
-  .grid-cell--mine {
-    background: var(--card);
-    border-color: var(--rule-strong);
-    color: var(--ink);
-  }
-  /* 틀린 칸 */
-  .grid-cell--wrong {
-    background: var(--pen-tint);
-    border: 2px solid var(--pen);
-    color: var(--pen-deep);
-    font-weight: 600;
-  }
-  /* 정답 줄에서 주목시킬 칸 */
-  .grid-cell--focus {
-    border: 2px solid var(--grid);
-    background: #fff;
-    color: var(--grid-deep);
-    font-weight: 600;
-  }
-  /* 받침 오류는 동그라미로 구분 */
-  .grid-cell--batchim {
-    border-radius: 50%;
-  }
-  /* 비어 있는 자리 */
-  .grid-cell--void {
-    border-style: dashed;
-    border-color: var(--rule-strong);
-    background: transparent;
-    color: var(--ink-faint);
-  }
+  /*
+    옛 채점표가 쓰던 칸 색들(--answer --mine --wrong --focus --batchim --void)이
+    여기 있었습니다. 채점표를 원고지 한 벌로 합치면서 쓰는 곳이 없어져 걷어냅니다.
+    `.grid-cell` 자체는 남깁니다 — 기다리는 표시(LoadingCells)가 아직 씁니다.
+  */
 
   /* ---------- 비밀번호 보기 ----------
      확인 칸과 함께 둡니다. 폰에서는 오타를 이쪽이 더 잘 막습니다. */
@@ -634,6 +602,21 @@
     .page--write {
       padding-inline: 10px;
     }
+  }
+
+  /*
+    「문 앞」 화면의 제목 — 초록.
+
+    로그인 · 가입 완료 · 비밀번호 · 프로필 고르기 · 홈.
+    아직 「누가 쓰는지」 정하기 전이거나, 화면 이름이 곧 앱 이름인 자리입니다.
+    여기서 초록은 장식이 아니라 **브랜드 자리**라는 표시입니다.
+
+    앱 안의 보통 화면(받아쓰기 · 오답노트 · 리포트 …)은 먹색 그대로 둡니다.
+    원래도 그렇게 나뉘어 있었는데 어디에도 적어 두지 않아 우연처럼 보였습니다.
+    클래스로 만들어 두면 다음에 화면을 더할 때 어느 쪽인지 고르게 됩니다.
+  */
+  .title-entry {
+    color: var(--grid-deep);
   }
 
   /*

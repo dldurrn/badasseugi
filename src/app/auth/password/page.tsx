@@ -36,7 +36,7 @@ export default function PasswordPage() {
   return (
     <main className="page" style={{ paddingBottom: 40 }}>
       <header className="pb-6 pt-16 text-center">
-        <h1 className="display text-2xl font-bold" style={{ color: 'var(--grid-deep)' }}>
+        <h1 className="display title-entry text-2xl font-bold">
           새 비밀번호
         </h1>
       </header>

@@ -223,7 +223,7 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
       <header className="pb-8 pt-16 text-center">
         {/* 금색은 보상 전용입니다. 여는 화면의 장식으로 쓰면 보상의 무게가 새어 나갑니다. */}
         <div className="mx-auto mb-4 h-1 w-12 rounded-full" style={{ background: 'var(--grid)' }} />
-        <h1 className="display text-[30px] font-bold" style={{ color: 'var(--grid-deep)' }}>
+        <h1 className="display title-entry text-[30px] font-bold">
           {heading.title}
         </h1>
         <p className="mt-2 text-sm" style={{ color: 'var(--ink-soft)' }}>

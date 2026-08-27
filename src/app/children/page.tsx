@@ -14,7 +14,7 @@ export default async function ChildrenPage() {
   return (
     <main className="page">
       <header className="pb-6 pt-10 text-center">
-        <h1 className="display text-2xl font-bold" style={{ color: 'var(--grid-deep)' }}>
+        <h1 className="display title-entry text-2xl font-bold">
           누가 공부할까요?
         </h1>
         <p className="mt-1.5 text-sm" style={{ color: 'var(--ink-soft)' }}>

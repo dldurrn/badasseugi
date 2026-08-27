@@ -34,7 +34,7 @@ export default async function HomePage() {
           className="mx-auto mb-4 h-1 w-12 rounded-full"
           style={{ background: 'var(--grid)' }}
         />
-        <h1 className="display text-[30px] font-bold" style={{ color: 'var(--grid-deep)' }}>
+        <h1 className="display title-entry text-[30px] font-bold">
           받아쓰기 공책
         </h1>
         <p className="mt-1 text-sm" style={{ color: 'var(--ink-soft)' }}>

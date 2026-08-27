@@ -26,6 +26,13 @@ import {
 /** 받아쓰기 문장 상한과 같게 둡니다. 이보다 긴 요청은 우리 화면에서 나올 수 없습니다. */
 const MAX_TEXT = 200;
 
+/** 코드마다 사람이 읽을 문구. 화면에 그대로 띄워도 말이 되게 둡니다. */
+const TTS_MESSAGE = {
+  'daily-limit': '오늘 읽어 줄 수 있는 만큼을 다 썼어요. 내일 다시 들을 수 있어요.',
+  blocked: '음성 서비스가 사용을 막았어요. 기다린다고 풀리지는 않아요.',
+  failed: '소리를 만들지 못했어요. 잠시 후 다시 눌러 주세요.',
+} as const;
+
 interface Body {
   text?: unknown;
   rate?: unknown;
@@ -38,7 +45,10 @@ export async function POST(request: Request) {
   const engines = pickEngines();
   if (engines.length === 0) {
     // 화면이 조용히 브라우저 음성으로 넘어가도록 이유를 담아 보냅니다.
-    return NextResponse.json({ error: 'tts-not-configured' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'tts-not-configured', message: '음성 서비스가 연결되지 않았어요.' },
+      { status: 503 },
+    );
   }
 
   const auth = await requireUser();
@@ -109,7 +119,16 @@ export async function POST(request: Request) {
 
   if (!result || !served) {
     const status = reason === 'daily-limit' ? 429 : reason === 'blocked' ? 403 : 502;
-    return NextResponse.json({ error: `tts-${reason}` }, { status });
+    /*
+      코드와 한국어 문구를 함께 보냅니다.
+
+      화면은 `error` 코드를 보고 갈래를 정합니다 — 잠깐 끊긴 것인지,
+      오늘 몫을 다 쓴 것인지, 아예 막힌 것인지에 따라 할 일이 다릅니다.
+      다만 코드만 보내면 이 라우트만 다른 라우트와 말이 다릅니다.
+      다른 곳은 모두 화면에 그대로 띄울 수 있는 한국어를 돌려줍니다.
+      나중에 누가 이 응답을 그냥 보여 줘도 「tts-blocked」가 뜨지 않도록 둘 다 담습니다.
+    */
+    return NextResponse.json({ error: `tts-${reason}`, message: TTS_MESSAGE[reason] }, { status });
   }
 
   // 사용량 기록 (실패해도 소리는 돌려줍니다)
