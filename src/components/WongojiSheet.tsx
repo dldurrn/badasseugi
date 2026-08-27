@@ -30,6 +30,14 @@ interface WongojiSheetProps {
    * 쓰기 화면에서만 씁니다.
    */
   gridRef?: RefObject<HTMLDivElement | null>;
+  /**
+   * 담긴 상자를 꽉 채웁니다.
+   *
+   * 기본은 528px에서 멈춥니다 — 카드 안 미리보기가 휑해지지 않도록.
+   * 다만 넓힌 화면(.page--write)이나 채점 카드 안에서는 멈추면 안 됩니다.
+   * 격자만 좁으면 위아래 라벨·버튼과 세로선이 어긋나 기둥이 둘로 보입니다.
+   */
+  fill?: boolean;
   /** 미리보기에서 문장부호를 빨간펜 색으로 짚어 줍니다 */
   markPunct?: boolean;
   label?: string;
@@ -41,6 +49,7 @@ export function WongojiSheet({
   cells,
   cursor,
   active = false,
+  fill = false,
   composingAt,
   gridRef,
   markPunct = false,
@@ -49,7 +58,7 @@ export function WongojiSheet({
   return (
     <div
       ref={gridRef}
-      className="wg"
+      className={fill ? 'wg wg--fill' : 'wg'}
       style={{ ['--wg-cols' as string]: WONGOJI_COLS }}
       role="group"
       aria-label={label ?? '원고지'}

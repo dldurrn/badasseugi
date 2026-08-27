@@ -11,9 +11,11 @@ import { initSfx, sfx } from '@/lib/sfx';
 import { SpeechController } from '@/lib/tts';
 import { appSpeech, readRate } from '@/lib/tts-app';
 import type { Module } from '@/lib/types';
-import { writingToText } from '@/lib/wongoji';
+import { SENTENCE_MAX } from '@/lib/sets';
+import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
 import { readWriteMode, type WriteMode } from '@/lib/write-mode';
 import { WongojiInput } from './WongojiInput';
+import { WongojiSheet } from './WongojiSheet';
 
 /**
  * 오답노트 목록에서 그 자리 풀기.
@@ -234,12 +236,19 @@ export function InlineNotePractice({
         <p className="display text-sm font-bold" style={{ color: 'var(--grid-deep)' }}>
           이대로 제출할까요?
         </p>
-        <p
-          className="my-2 rounded-sm px-3 py-2 text-lg"
-          style={{ background: 'var(--paper-sunk)', letterSpacing: '0.04em' }}
-        >
-          {answer}
-        </p>
+        {/* 쓸 때 본 그대로 — 세션 화면과 같은 이유입니다 */}
+        {module === 'dictation' && writeMode === 'wongoji' ? (
+          <div className="my-2">
+            <WongojiSheet cells={padToGrid(toCells(answer), 1)} fill label="제출할 문장" />
+          </div>
+        ) : (
+          <p
+            className="my-2 rounded-sm px-3 py-2 text-lg"
+            style={{ background: 'var(--paper-sunk)', letterSpacing: '0.04em' }}
+          >
+            {answer}
+          </p>
+        )}
         <div className="flex gap-2">
           <button
             className="btn btn-secondary flex-1"
@@ -320,6 +329,7 @@ export function InlineNotePractice({
                 if (canConfirm) setPhase('confirming');
               }}
               inputRef={inputRef}
+              maxLength={SENTENCE_MAX}
             />
           ) : (
             <input

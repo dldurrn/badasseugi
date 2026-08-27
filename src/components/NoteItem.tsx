@@ -43,7 +43,18 @@ export function NoteItem({
   const hideAnswer = open && note.module === 'dictation';
 
   return (
-    <li className="surface p-4">
+    /*
+      받아쓰기를 푸는 동안만 카드를 넓힙니다.
+
+      원고지는 15칸이라 **카드 폭이 곧 글자 크기**입니다.
+      좁은 카드 안에서는 칸이 18px까지 줄고, 글자는 하한(14px)에 걸려
+      칸의 77%를 채웁니다 — 작은 데다 칸에 끼기까지 합니다.
+      같은 「한 문장 받아쓰기」인데 세션 화면과 딴판이 됩니다.
+
+      넓히는 것은 격자가 아니라 카드입니다(.page--write와 같은 이치) —
+      격자만 밀어내면 듣기 버튼과 확인 버튼이 그대로 있어 기둥이 둘로 보입니다.
+    */
+    <li className={open && note.module === 'dictation' ? 'surface p-4 note--writing' : 'surface p-4'}>
       <div className="flex items-start justify-between gap-3">
         <span
           className="flex-1 text-base"

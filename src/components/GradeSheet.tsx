@@ -149,7 +149,7 @@ function GradePaper({ result }: { result: GradeResult }) {
       {rows.map((row, r) => (
         <div
           key={r}
-          className="wg wg--grade"
+          className="wg wg--fill"
           style={{ ['--wg-cols' as string]: WONGOJI_COLS }}
           aria-hidden="true"
         >
@@ -176,7 +176,7 @@ function AnswerPaper({ answer }: { answer: string }) {
     <div className="wg-grade">
       <p className="sr-only">정답: {answer}</p>
       <div
-        className="wg wg--grade"
+        className="wg wg--fill"
         style={{ ['--wg-cols' as string]: WONGOJI_COLS }}
         aria-hidden="true"
       >

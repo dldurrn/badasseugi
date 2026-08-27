@@ -12,11 +12,13 @@ import {
 import { sfx } from '@/lib/sfx';
 import { appSpeech, DEFAULT_RATE, RATES, readRate, writeRate } from '@/lib/tts-app';
 import { LEAVE_MESSAGE, useLeaveGuard } from '@/lib/use-leave-guard';
-import { writingToText } from '@/lib/wongoji';
+import { SENTENCE_MAX } from '@/lib/sets';
+import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
 import { readWriteMode, saveWriteMode, type WriteMode } from '@/lib/write-mode';
 import { GradeSheet } from './GradeSheet';
 import { NextButton } from './NextButton';
 import { WongojiInput } from './WongojiInput';
+import { WongojiSheet } from './WongojiSheet';
 import type { Mode } from '@/lib/types';
 
 /**
@@ -341,6 +343,7 @@ export function DictationSession({
               onChange={setTyped}
               onEnter={askConfirm}
               inputRef={inputRef}
+              maxLength={SENTENCE_MAX}
             />
           ) : (
             <input
@@ -379,12 +382,26 @@ export function DictationSession({
           <p className="display text-base font-bold" style={{ color: 'var(--grid-deep)' }}>
             이대로 제출할까요?
           </p>
-          <p
-            className="w-full rounded-sm px-4 py-3 text-center text-xl"
-            style={{ background: 'var(--paper-sunk)', letterSpacing: '0.04em' }}
-          >
-            {pending}
-          </p>
+          {/*
+            쓸 때 본 그대로 보여 줍니다.
+
+            여기만 한 줄짜리 글이었습니다. 쓰기(원고지) → 확인(글) → 채점(원고지)이라
+            가운데서만 모양이 바뀌었는데, 하필 여기가 "내가 쓴 게 이거 맞나?"를
+            아이에게 묻는 자리입니다. 견줄 것을 다른 모양으로 내밀면 대답할 수가 없습니다.
+
+            특히 쉼표 — 원고지 규칙대로 붙여 쓴 아이가 여기서 공백이 되살아난 문장을 보면
+            자기가 틀린 줄 알고 「다시 고치기」를 누릅니다. 바르게 썼는데도요.
+          */}
+          {writeMode === 'wongoji' ? (
+            <WongojiSheet cells={padToGrid(toCells(pending), 1)} fill label="제출할 문장" />
+          ) : (
+            <p
+              className="w-full rounded-sm px-4 py-3 text-center text-xl"
+              style={{ background: 'var(--paper-sunk)', letterSpacing: '0.04em' }}
+            >
+              {pending}
+            </p>
+          )}
           <p className="text-xs" style={{ color: 'var(--ink-faint)' }}>
             제출하면 채점돼요
           </p>
