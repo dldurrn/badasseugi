@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { badRequest, normalizeNickname, readJson, requireUser } from '@/lib/api';
 import { DEFAULT_AVATAR, isAllowedAvatar } from '@/lib/avatars';
+import { limitsFor, planOf } from '@/lib/plan';
 import { MAX_CHILDREN } from '@/lib/profile';
 import { hashPin, isValidPin } from '@/lib/pin';
 
@@ -43,8 +44,20 @@ export async function POST(request: Request) {
     .select('id', { count: 'exact', head: true })
     .eq('family_id', user.id);
 
-  if ((count ?? 0) >= MAX_CHILDREN) {
-    return badRequest(`프로필은 ${MAX_CHILDREN}개까지 만들 수 있어요.`);
+  /*
+    상한이 둘입니다.
+
+    `MAX_CHILDREN` 은 「실수로 늘어나는 것」을 막는 벽이고,
+    요금제 한도는 「돈을 낸 만큼」을 나누는 선입니다. 뜻이 다르니 둘 다 둡니다.
+    지금은 요금제가 꺼져 있어(lib/plan.ts) 실질적으로 MAX_CHILDREN 만 걸립니다.
+  */
+  const 한도 = Math.min(MAX_CHILDREN, limitsFor(planOf(null)).children);
+  if ((count ?? 0) >= 한도) {
+    return badRequest(
+      한도 < MAX_CHILDREN
+        ? `무료로는 프로필을 ${한도}개까지 만들 수 있어요.`
+        : `프로필은 ${한도}개까지 만들 수 있어요.`,
+    );
   }
 
   const { data, error } = await supabase

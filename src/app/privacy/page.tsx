@@ -1,3 +1,5 @@
+import { CONTACT, OPERATOR, PRIVACY_DATE } from '@/lib/legal';
+
 export const metadata = { title: '개인정보처리방침 · 받아쓰기 공책' };
 
 /**
@@ -13,9 +15,9 @@ export const metadata = { title: '개인정보처리방침 · 받아쓰기 공�
  * 언제부터 적용되는 방침인지가 고지의 핵심입니다.
  */
 
-const OPERATOR = '이영훈';
-const CONTACT = 'lyhza@naver.com';
-const EFFECTIVE_DATE = '시행일: 2026년 8월 19일';
+/* 운영자·연락처는 이용약관과 같은 곳에서 가져옵니다 — 두 문서가 어긋나면
+   부모가 안 쓰는 주소로 문의를 보내게 됩니다. */
+const EFFECTIVE_DATE = `시행일: ${PRIVACY_DATE}`;
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

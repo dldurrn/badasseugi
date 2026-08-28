@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api';
+import { limitsFor, planOf } from '@/lib/plan';
 
 /**
  * 문제지 사진에서 받아쓰기 문장을 추출합니다.
@@ -123,6 +124,20 @@ export async function POST(request: Request) {
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
   const { supabase, user } = auth;
+
+  /*
+    사진으로 문제 넣기는 유료 기능이 될 자리입니다(lib/plan.ts).
+    지금은 `PLAN_ENABLED` 가 꺼져 있어 아무도 막히지 않습니다 —
+    돈을 낼 길이 없는데 막으면 안 되니까요.
+    켜는 순간 여기서 걸립니다. 화면 여기저기에 조건문을 뿌리지 않으려고
+    막는 자리를 미리 정해 둡니다.
+  */
+  if (!limitsFor(planOf(null)).photoInput) {
+    return NextResponse.json(
+      { error: '사진으로 문제 넣기는 유료에서 쓸 수 있어요. 직접 입력으로도 넣을 수 있어요.' },
+      { status: 402 },
+    );
+  }
 
   // 일일 사용량 확인
   const limit = Number(process.env.OCR_DAILY_LIMIT ?? 30);
