@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { InstallRow } from '@/components/InstallGuide';
 import { ShowGuideAgain } from '@/components/ShowGuideAgain';
 import { CONTACT } from '@/lib/legal';
 import { readActiveProfile } from '@/lib/profile-server';
@@ -69,6 +70,14 @@ export default async function MorePage() {
             </Link>
           </li>
         ))}
+        {/*
+          홈 화면에 두는 법. 이미 홈 화면에서 열렸으면 줄 자체가 사라집니다 —
+          시킨 대로 한 사람에게 또 시키면 성의 없어 보입니다.
+          아이 화면에도 둡니다. 아이 기기에 앉히는 것은 부모가 그 기기에서 하니까요.
+        */}
+        <li>
+          <InstallRow />
+        </li>
         <li>
           <ShowGuideAgain />
         </li>

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CoachMarks } from '@/components/CoachMarks';
+import { InstallCard } from '@/components/InstallCard';
 import { getHomeSummary } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
@@ -65,6 +66,12 @@ export default async function HomePage() {
         한 번 보면 다시 안 뜨고, 더보기에서 되살릴 수 있습니다.
       */}
       <CoachMarks tour={isParent ? 'home-parent' : 'home-child'} />
+
+      {/*
+        홈 화면에 두라는 권유는 보호자 화면에만 둡니다.
+        아이 화면에 띄워도 아이가 할 수 있는 일이 아닙니다.
+      */}
+      {isParent && <InstallCard />}
 
       <section className="mb-6 grid grid-cols-2 gap-3">
         <Link href="/dictation" data-coach="dictation" className="surface flex flex-col gap-1 p-4">
