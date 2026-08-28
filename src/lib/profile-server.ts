@@ -9,6 +9,7 @@ import {
   parseView,
   type ViewMode,
 } from '@/lib/profile';
+import { activeChildRow, familyRow } from '@/lib/request-context';
 import type { ChildProfile } from '@/lib/types';
 
 /** 서버에서만 쓰는 프로필 조회·저장. pin_hash는 여기서 걸러 내고 밖으로 내보내지 않습니다. */
@@ -61,14 +62,14 @@ export interface ActiveProfile {
 }
 
 export async function readActiveProfile(): Promise<ActiveProfile> {
-  const store = await cookies();
-  const view = parseView(store.get(VIEW_COOKIE)?.value);
-  const childId = store.get(ACTIVE_CHILD_COOKIE)?.value;
-
-  if (!childId) return { view, child: null };
-
-  // 프로필이 지워졌을 수 있으므로 쿠키 값을 그대로 믿지 않고 다시 확인합니다.
-  return { view, child: await getChild(childId) };
+  const view = parseView((await cookies()).get(VIEW_COOKIE)?.value);
+  /*
+    자녀 행은 요청 캐시에서 가져옵니다(request-context.ts).
+    설정도 같은 행을 보므로, 화면 하나에서 같은 줄을 두 번 읽던 것이 한 번이 됩니다.
+    프로필이 지워졌을 수 있어 쿠키 값을 그대로 믿지 않는 것은 그대로입니다.
+  */
+  const row = await activeChildRow();
+  return { view, child: row ? toProfile(row) : null };
 }
 
 /** 세션 화면에서 쓸 자녀. 자녀 모드가 아니면 null 입니다. */
@@ -106,35 +107,11 @@ export async function clearProfileCookies(): Promise<void> {
 
 /** 잠금이 걸려 있는지. 해시 자체는 절대 밖으로 내보내지 않습니다. */
 export async function isParentLocked(): Promise<boolean> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data } = await supabase
-    .from('families')
-    .select('parent_pin_hash')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  return Boolean(data?.parent_pin_hash);
+  return Boolean((await familyRow())?.parent_pin_hash);
 }
 
 export async function readParentPinHash(): Promise<string | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data } = await supabase
-    .from('families')
-    .select('parent_pin_hash')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  return (data?.parent_pin_hash as string | null) ?? null;
+  return (await familyRow())?.parent_pin_hash ?? null;
 }
 
 export async function hasParentGrace(): Promise<boolean> {
