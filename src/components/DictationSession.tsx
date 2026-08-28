@@ -19,6 +19,7 @@ import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
 
 import { GradeSheet } from './GradeSheet';
 import { NextButton } from './NextButton';
+import { CoachMarks } from './CoachMarks';
 import { WongojiInput } from './WongojiInput';
 import { WongojiSheet } from './WongojiSheet';
 import type { Mode } from '@/lib/types';
@@ -260,6 +261,7 @@ export function DictationSession({
         <button
           onClick={() => play('flow')}
           disabled={speaking !== null}
+          data-coach="listen"
           className="btn"
           style={{
             background: 'var(--grid)',
@@ -343,6 +345,7 @@ export function DictationSession({
             들은 문장을 써 보세요
           </label>
 
+          <div data-coach="write">
           {writeMode === 'wongoji' ? (
             <WongojiInput
               value={typed}
@@ -369,13 +372,24 @@ export function DictationSession({
               enterKeyHint="done"
             />
           )}
+          </div>
           <button
             onClick={askConfirm}
             disabled={!typed.trim()}
+            data-coach="check"
             className="btn btn-primary btn-lg mt-3"
           >
             확인
           </button>
+
+          {/*
+            첫 문장을 쓰기 시작하는 자리에서만 짚어 줍니다.
+
+            보상이 아니라 안내이므로 절대 원칙 1(도중에 축하 연출 금지)에 걸리지 않지만,
+            **푸는 흐름을 끊지 않도록** 아직 아무것도 쓰지 않은 첫 문장에서만 뜹니다.
+            덮개가 클릭을 막지 않으니 짚어 준 버튼은 그 자리에서 눌러 볼 수 있습니다.
+          */}
+          {index === 0 && <CoachMarks tour="session" />}
         </>
       )}
 

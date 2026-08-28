@@ -6,6 +6,7 @@ import { prepareImageForUpload } from '@/lib/prepare-image';
 import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
 import { padToGrid, toCells, WONGOJI_COLS } from '@/lib/wongoji';
 import { readSetView, saveSetView, type SetView } from '@/lib/write-mode';
+import { CoachMarks } from './CoachMarks';
 import { WongojiSheet } from './WongojiSheet';
 
 /**
@@ -375,6 +376,13 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         if (canSave) save();
       }}
     >
+      {/*
+        여기서 짚습니다. 홈에서 「사진으로 넣을 수 있어요」라고 말해 둬도
+        정작 이 화면에 들어와 버튼을 찾는 것은 별개의 일이라, 알려 주는 시점을
+        쓰는 시점에 붙입니다.
+      */}
+      <CoachMarks tour="new-set" />
+
       <label className="section-title mb-2 block" htmlFor="set-name">
         세트 이름
       </label>
@@ -397,7 +405,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         한 입력칸으로는 둘 다 못 하므로 입력칸도 둘로 나눕니다.
         (PC에서는 카메라 버튼도 파일 선택창이 열립니다 — 그래서 앨범을 앞에 둡니다.)
       */}
-      <div className="mb-3 grid grid-cols-2 gap-2">
+      <div className="mb-3 grid grid-cols-2 gap-2" data-coach="photo">
         <button
           type="button"
           className="btn btn-secondary justify-center"
@@ -594,7 +602,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
       )}
 
       {view === 'wongoji' && filled.length > 0 ? (
-        <ul className="mb-3 flex flex-col gap-3">
+        <ul className="mb-3 flex flex-col gap-3" data-coach="sentences">
           {filled.map((sentence, index) => {
             const cells = toCells(sentence);
             // 몇 줄이 되는지 부모가 만들면서 알아야 합니다.
@@ -626,7 +634,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
           })}
         </ul>
       ) : (
-      <ul className="mb-3 flex flex-col gap-2">
+      <ul className="mb-3 flex flex-col gap-2" data-coach="sentences">
         {sentences.map((sentence, index) => (
           <li key={index} className="flex items-center gap-1.5">
             <span

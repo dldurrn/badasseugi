@@ -17,7 +17,13 @@ import {
  *  하는 일은 같고, 파일 이름과 내보내는 함수 이름만 바뀌었습니다.)
  */
 
-const PUBLIC_PATHS = ['/login', '/auth', '/privacy'];
+/*
+  로그인 전에도 열려야 하는 화면.
+
+  약관이 여기 있는 것은 가입 화면에서 링크로 걸리기 때문입니다 —
+  가입하기 전에 읽으라고 걸어 놓고, 누르면 로그인으로 돌려보내면 말이 안 됩니다.
+*/
+const PUBLIC_PATHS = ['/login', '/auth', '/privacy', '/terms'];
 
 /** 프로필을 고르기 전에도 열려 있어야 하는 화면 (선택 화면 자체와 그 안의 흐름) */
 const PROFILE_PATHS = ['/children'];
@@ -94,5 +100,12 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|webp)$).*)'],
+  /*
+    manifest.webmanifest 을 빼는 것을 잊지 마세요.
+    확장자가 png·svg 가 아니라 아래 규칙에 안 걸리는데, 이게 로그인으로 막히면
+    아직 로그인하지 않은 기기에서 「홈 화면에 추가」가 이름도 아이콘도 없이 붙습니다.
+  */
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|webp)$).*)',
+  ],
 };

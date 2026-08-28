@@ -649,3 +649,97 @@
     text-transform: none;
   }
 }
+
+@layer components {
+  /* ---------- 코치마크 — 한 곳만 짚어 주는 안내 ---------- */
+
+  /*
+    덮개 전체는 클릭을 받지 않습니다. **짚어 준 버튼이 실제로 눌러져야** 하니까요.
+    말풍선만 다시 클릭을 받습니다.
+  */
+  .coach {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    pointer-events: none;
+  }
+
+  /*
+    어두운 막은 이 상자의 그림자입니다.
+    SVG 마스크 대신 쓰는 이유는 모서리 둥글리기가 그냥 되고, 다시 그릴 때 가볍기 때문입니다.
+  */
+  .coach-hole {
+    position: fixed;
+    border-radius: 10px;
+    box-shadow:
+      0 0 0 3px var(--grid),
+      0 0 0 9999px rgba(21, 27, 33, 0.62);
+    transition:
+      top 0.22s ease,
+      left 0.22s ease,
+      width 0.22s ease,
+      height 0.22s ease;
+  }
+
+  .coach-balloon {
+    position: fixed;
+    width: min(320px, calc(100vw - 24px));
+    pointer-events: auto;
+    background: var(--card);
+    border: 2px solid var(--grid);
+    border-radius: var(--radius);
+    padding: 16px 18px 14px;
+    box-shadow: 0 10px 30px rgba(21, 27, 33, 0.28);
+  }
+
+  .coach-dots {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+  .coach-dots span {
+    height: 5px;
+    width: 5px;
+    border-radius: 999px;
+    background: var(--rule-strong);
+    transition: width 0.2s ease;
+  }
+  .coach-dots span.is-done {
+    background: var(--grid);
+  }
+  .coach-dots span.is-here {
+    width: 16px;
+    background: var(--grid);
+  }
+
+  .coach-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--grid-deep);
+  }
+
+  .coach-body {
+    margin: 5px 0 0;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+  }
+
+  .coach-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .coach-skip {
+    font-size: 12.5px;
+    padding-left: 0;
+  }
+  .coach-count {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+  }
+}

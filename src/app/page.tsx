@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Onboarding } from '@/components/Onboarding';
+import { CoachMarks } from '@/components/CoachMarks';
 import { getHomeSummary } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
@@ -43,6 +43,7 @@ export default async function HomePage() {
 
         <Link
           href="/children"
+          data-coach="profile"
           className="surface mx-auto mt-4 inline-flex items-center gap-2 px-3 py-1.5"
           style={{ borderRadius: 999 }}
         >
@@ -58,11 +59,15 @@ export default async function HomePage() {
         </Link>
       </header>
 
-      {/* 처음 온 사람에게만 보입니다. 한 번 닫으면 더보기에서 다시 열 수 있습니다. */}
-      <Onboarding isParent={isParent} />
+      {/*
+        처음 온 사람에게 이 화면에 있는 것만 하나씩 짚어 줍니다.
+        부모와 아이는 할 일이 아예 달라서 짚을 곳도 다릅니다.
+        한 번 보면 다시 안 뜨고, 더보기에서 되살릴 수 있습니다.
+      */}
+      <CoachMarks tour={isParent ? 'home-parent' : 'home-child'} />
 
       <section className="mb-6 grid grid-cols-2 gap-3">
-        <Link href="/dictation" className="surface flex flex-col gap-1 p-4">
+        <Link href="/dictation" data-coach="dictation" className="surface flex flex-col gap-1 p-4">
           <span className="display text-base font-bold">받아쓰기</span>
           <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
             듣고 쓰기
@@ -82,10 +87,10 @@ export default async function HomePage() {
           <div className="surface p-5 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
             아이가 풀 문제를 넣어 두고, 리포트로 확인해요.
             <div className="mt-3 flex justify-center gap-2">
-              <Link href="/dictation/new" className="btn btn-secondary">
+              <Link href="/dictation/new" data-coach="new-set" className="btn btn-secondary">
                 문제 세트 만들기
               </Link>
-              <Link href="/report" className="btn btn-secondary">
+              <Link href="/report" data-coach="report" className="btn btn-secondary">
                 리포트
               </Link>
             </div>
@@ -106,7 +111,7 @@ export default async function HomePage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/notes" className="surface flex flex-col gap-1 p-4">
+            <Link href="/notes" data-coach="notes" className="surface flex flex-col gap-1 p-4">
               <span className="display text-base font-bold">오답노트</span>
               <span className="text-xs" style={{ color: 'var(--ink-soft)' }}>
                 {activeNotes > 0 ? `모으는 중 ${activeNotes}개` : '틀린 문제가 모여요'}
