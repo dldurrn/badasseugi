@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SpeechController } from '@/lib/tts';
-import { appSpeech, setActiveVoice } from '@/lib/tts-app';
+import { appSpeech, clearVoiceCache, setActiveVoice } from '@/lib/tts-app';
 import { saveSettings } from '@/lib/save-settings';
+import type { EnginePref } from '@/lib/settings';
 import type { SpeechRate } from '@/lib/tts';
 
 /**
@@ -79,6 +80,19 @@ const ENGINE_LABEL: Record<string, string> = {
   typecast: 'Typecast',
   google: 'Google',
 };
+
+/*
+  회사를 고르는 자리.
+
+  「자동」이 맨 앞입니다 — 대개는 서버가 정한 순서가 맞고,
+  회사를 짚는 것은 **들어 보고 이쪽이 낫다고 정했을 때**만 하는 일입니다.
+  자동에 설명을 붙여 두는 것은, 짚어 두면 무엇이 달라지는지 알려 주기 위해서입니다.
+*/
+const ENGINE_CHOICES: Array<{ id: EnginePref; label: string; hint: string }> = [
+  { id: 'auto', label: '자동', hint: '되는 쪽으로 알아서' },
+  { id: 'typecast', label: 'Typecast', hint: '한국어 전용' },
+  { id: 'google', label: 'Google', hint: '넉넉한 무료 한도' },
+];
 
 /** 고전 계열 이름 형태: ko-KR-Neural2-A 처럼 계열과 글자로 끝납니다. */
 const CLASSIC = /^ko-KR-(Neural2|Wavenet|Standard)-([A-Z])$/;
@@ -317,18 +331,49 @@ export function VoiceSettings({
   const [defaultVoice, setDefaultVoice] = useState<string | null>(null);
   /** 지금 소리를 만드는 회사. 보호자 화면에만 밝힙니다. */
   const [engine, setEngine] = useState<string | null>(null);
+  /** 부모가 골라 둔 것. 'auto' 면 서버가 정합니다. */
+  const [pref, setPref] = useState<EnginePref>('auto');
+  /** 키가 꽂혀 있어 고를 수 있는 회사들. 하나뿐이면 고를 거리를 안 그립니다. */
+  const [available, setAvailable] = useState<string[]>([]);
+  /**
+   * 목록과 기본값은 서버가 정합니다. 화면은 어느 회사인지 몰라도 됩니다.
+   * 회사를 바꿀 때도 같은 함수를 씁니다 — 그때 목록이 통째로 갈립니다.
+   *
+   * 새로 켜질 목소리 이름을 돌려줍니다. 바꾸자마자 들려주려면 그게 필요합니다.
+   */
+  const load = useCallback(async (): Promise<string | null> => {
+    try {
+      const r = await fetch('/api/tts/voices');
+      const payload: {
+        voices?: VoiceOption[];
+        defaultVoice?: string | null;
+        engine?: string | null;
+        pref?: EnginePref;
+        available?: string[];
+      } = r.ok ? await r.json() : { voices: [] };
+
+      const list = payload.voices ?? [];
+      setVoices(list);
+      setDefaultVoice(payload.defaultVoice ?? null);
+      setEngine(payload.engine ?? null);
+      setPref(payload.pref ?? 'auto');
+      setAvailable(payload.available ?? []);
+      /*
+        회사가 바뀌면 목소리 이름 형태도 바뀝니다(`tc_…` → `ko-KR-…`).
+        방금 누른 것을 그대로 들고 있으면 새 목록에 없어 아무것도 안 켜집니다.
+        서버가 저장된 목소리를 남녀 지켜 옮겨 주므로, 여기서는 손을 떼면 됩니다.
+      */
+      setPicked(null);
+      return payload.defaultVoice ?? list[0]?.name ?? null;
+    } catch {
+      setVoices([]);
+      return null;
+    }
+  }, []);
 
   useEffect(() => {
-    // 목록과 기본값은 서버가 정합니다. 화면은 어느 회사인지 몰라도 됩니다.
-    fetch('/api/tts/voices')
-      .then((r) => (r.ok ? r.json() : { voices: [] }))
-      .then((payload: { voices?: VoiceOption[]; defaultVoice?: string | null; engine?: string | null }) => {
-        setVoices(payload.voices ?? []);
-        setDefaultVoice(payload.defaultVoice ?? null);
-        setEngine(payload.engine ?? null);
-      })
-      .catch(() => setVoices([]));
-  }, []);
+    void load();
+  }, [load]);
 
   const groups = useMemo(
     () => (voices ? buildGroups(voices, defaultVoice) : []),
@@ -364,6 +409,39 @@ export function VoiceSettings({
 
   if (!voices || voices.length === 0) return null;
 
+  /*
+    회사 바꾸기. 목록을 다시 받고, 한 문장을 읽어 줍니다.
+
+    저장을 기다렸다가 목록을 받습니다 — 여기서는 순서가 중요합니다.
+    저장 전에 물으면 서버가 아직 옛 회사로 답해서, 눌러도 안 바뀐 것처럼 보입니다.
+    (다른 설정은 눌린 느낌이 먼저라 기다리지 않지만, 이건 응답이 곧 결과입니다.)
+  */
+  const chooseEngine = async (next: EnginePref) => {
+    setPref(next);
+    /*
+      목록을 비우지 않습니다. 아래에 「목록이 없으면 아무것도 안 그림」이 있어서,
+      비우면 회사를 바꾸는 동안 **고르는 자리까지 통째로 사라집니다.**
+      방금 누른 칩이 이미 켜져 있으니 반응은 그것으로 충분합니다.
+    */
+    await saveSettings('family', { engine: next });
+
+    /*
+      담아 둔 소리는 **다른 회사가 만든 것**이라 버립니다.
+      안 버리면 회사를 바꿔도 예전 소리가 그대로 나서, 눌러도 안 바뀐 것처럼 들립니다.
+    */
+    clearVoiceCache();
+
+    const 새목소리 = await load();
+    if (!새목소리) return;
+
+    // 곧바로 들려줍니다 — 이 설정의 요점이 「어느 쪽 소리가 나은가」입니다.
+    setActiveVoice(새목소리);
+    setPlaying(새목소리);
+    const speech = new SpeechController(appSpeech);
+    await speech.play(SAMPLE, rate, 'flow');
+    setPlaying(null);
+  };
+
   const choose = async (name: string) => {
     setPicked(name);
     // 담아 둔 소리는 옛 목소리라 버리고, 이 화면의 미리듣기도 새 목소리로 납니다.
@@ -393,12 +471,50 @@ export function VoiceSettings({
         아이에게는 안 보입니다. 아이가 알아야 할 것은 소리가 나느냐지
         어느 회사냐가 아니고, 회사 이름은 아이 화면에서 낯선 영어 낱말일 뿐입니다.
       */}
-      {scope === 'family' && engine && (
+      {scope === 'family' && engine && available.length < 2 && (
         <p className="mb-2 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
-          지금{' '}
-          <b style={{ color: 'var(--ink-soft)' }}>{ENGINE_LABEL[engine] ?? engine}</b>
-          로 읽고 있어요
+          지금 <b style={{ color: 'var(--ink-soft)' }}>{ENGINE_LABEL[engine] ?? engine}</b>로 읽고
+          있어요
         </p>
+      )}
+
+      {/*
+        회사를 고를 수 있는 것은 **키가 둘 다 꽂혀 있을 때뿐**입니다.
+        하나뿐인데 고를 거리를 그리면, 눌러도 아무것도 안 바뀌는 버튼이 생깁니다.
+
+        고르고 나면 곧바로 한 문장을 읽어 줍니다 — 이 설정의 요점이
+        「어느 쪽 소리가 나은가」라, 들어 보지 않으면 고를 수가 없습니다.
+      */}
+      {scope === 'family' && engine && available.length >= 2 && (
+        <div className="mb-4">
+          <div className="flex gap-1.5" role="group" aria-label="목소리 회사">
+            {ENGINE_CHOICES.filter((c) => c.id === 'auto' || available.includes(c.id)).map((c) => (
+              <button
+                key={c.id}
+                onClick={() => chooseEngine(c.id)}
+                aria-pressed={pref === c.id}
+                className="flex-1 rounded px-2 py-2 text-center transition-colors"
+                style={{
+                  background: pref === c.id ? 'var(--grid)' : 'var(--paper-sunk)',
+                  color: pref === c.id ? '#fff' : 'var(--ink-soft)',
+                }}
+              >
+                <span className="block text-[13px] font-bold">{c.label}</span>
+                <span
+                  className="mt-0.5 block text-[10.5px]"
+                  style={{ color: pref === c.id ? 'rgba(255,255,255,.82)' : 'var(--ink-faint)' }}
+                >
+                  {c.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+            지금 <b style={{ color: 'var(--ink-soft)' }}>{ENGINE_LABEL[engine] ?? engine}</b>로 읽고
+            있어요
+            {pref !== 'auto' && ' · 고른 쪽이 막히면 다른 쪽으로 넘어가요'}
+          </p>
+        </div>
       )}
 
       {/*

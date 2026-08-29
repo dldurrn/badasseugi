@@ -37,11 +37,29 @@ export const DEFAULT_SETTINGS: Settings = {
   voice: null,
 };
 
-/** 한 층에 저장된 값. 안 고른 것은 없거나 null입니다. */
+/**
+ * 어느 회사 목소리로 읽을지.
+ *
+ * `auto` 는 서버가 정한 순서대로(타입캐스트 먼저, 막혔으면 Google).
+ * 회사를 짚어도 **그 회사만 고집하지는 않습니다** — 막히면 다른 쪽으로 넘어갑니다.
+ * 아이 화면에서 소리가 나는 것이 어느 회사냐보다 중요합니다.
+ */
+export type EnginePref = 'auto' | 'typecast' | 'google';
+
+export const DEFAULT_ENGINE: EnginePref = 'auto';
+
+/**
+ * 한 층에 저장된 값. 안 고른 것은 없거나 null입니다.
+ *
+ * `engine` 만 **집 단위**라 부모 층에만 있습니다. 아이마다 다른 회사를 쓸 까닭이 없고,
+ * 이건 아이의 학습 취향이 아니라 집의 선택(소리 질과 비용)입니다.
+ */
 export interface SettingsPatch {
   rate?: number | null;
   writeMode?: string | null;
   voice?: string | null;
+  /** 부모 층에서만 씁니다. 아이 층에서는 언제나 비어 있습니다. */
+  engine?: EnginePref | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -61,6 +79,10 @@ export function cleanRate(value: unknown): SpeechRate | null {
 
 export function cleanWriteMode(value: unknown): WriteMode | null {
   return value === 'wongoji' || value === 'plain' ? value : null;
+}
+
+export function cleanEngine(value: unknown): EnginePref | null {
+  return value === 'auto' || value === 'typecast' || value === 'google' ? value : null;
 }
 
 /**
@@ -101,6 +123,7 @@ export function cleanPatch(raw: unknown): SettingsPatch {
   if ('rate' in body) patch.rate = cleanRate(body.rate);
   if ('writeMode' in body) patch.writeMode = cleanWriteMode(body.writeMode);
   if ('voice' in body) patch.voice = cleanVoice(body.voice);
+  if ('engine' in body) patch.engine = cleanEngine(body.engine);
   return patch;
 }
 
@@ -111,6 +134,12 @@ export function toColumns(patch: SettingsPatch, scope: 'family' | 'child'): Reco
   if ('rate' in patch) row[`${p}rate`] = patch.rate;
   if ('writeMode' in patch) row[`${p}write_mode`] = patch.writeMode;
   if ('voice' in patch) row[`${p}voice`] = patch.voice;
+  /*
+    회사 고르기는 집 단위라 부모 층에만 저장합니다.
+    아이 층으로 잘못 보내면 children 에 없는 칸이라 저장 전체가 실패합니다 —
+    목소리를 바꾸려던 아이가 아무것도 못 바꾸게 됩니다. 조용히 버리는 편이 낫습니다.
+  */
+  if ('engine' in patch && scope === 'family') row.default_engine = patch.engine;
   return row;
 }
 
@@ -125,5 +154,7 @@ export function fromRow(
     rate: cleanRate(row[`${p}rate`]),
     writeMode: cleanWriteMode(row[`${p}write_mode`]),
     voice: cleanVoice(row[`${p}voice`]),
+    // 아이 층에는 이 칸이 없습니다. 없으면 그냥 비어 있는 것으로 봅니다.
+    engine: scope === 'family' ? cleanEngine(row.default_engine) : null,
   };
 }

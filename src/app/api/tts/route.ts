@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { badRequest, readJson, requireUser } from '@/lib/api';
+import { readEnginePref } from '@/lib/settings-server';
 import {
   looksBlocked,
   matchVoice,
@@ -14,7 +15,7 @@ import {
  * 보안: API 키는 이 서버 라우트에서만 읽습니다(절대 원칙 8).
  * 클라이언트는 `/api/tts`만 부르고 키는 구경도 하지 못합니다.
  *
- * 어느 회사를 쓸지는 `lib/tts-engines.ts`가 환경 변수를 보고 정합니다.
+ * 어느 회사를 쓸지는 `lib/tts-engines.ts`가 환경 변수와 **부모가 고른 값**을 보고 정합니다.
  * 이 파일은 회사가 무엇인지 몰라도 됩니다 — 로그인 확인, 하루 한도, 응답만 맡습니다.
  *
  * **한 회사가 막히면 다음 회사로 넘어갑니다.** 아이 화면에서 소리가 나는 것이
@@ -42,7 +43,21 @@ interface Body {
 }
 
 export async function POST(request: Request) {
-  const engines = pickEngines();
+  const auth = await requireUser();
+  if (!auth.ok) return auth.response;
+  const { supabase, user } = auth;
+
+  /*
+    부모가 고른 회사를 앞세웁니다.
+
+    화면이 보낸 값을 쓰지 않습니다. 지금은 어느 쪽이든 우리 키로 우리 소리를 내는 것이라
+    위험할 것이 없지만, 나중에 요금제가 켜져 「무료는 Google」 같은 규칙이 생기면
+    화면이 정하게 둔 자리가 그대로 구멍이 됩니다.
+
+    도쿄를 한 번 더 다녀오지만(20ms 안팎) 합성 자체가 수백 ms 라 묻힙니다.
+    같은 요청 안에서는 캐시되어 두 번 읽지 않습니다(request-context.ts).
+  */
+  const engines = pickEngines(await readEnginePref());
   if (engines.length === 0) {
     // 화면이 조용히 브라우저 음성으로 넘어가도록 이유를 담아 보냅니다.
     return NextResponse.json(
@@ -50,10 +65,6 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-
-  const auth = await requireUser();
-  if (!auth.ok) return auth.response;
-  const { supabase, user } = auth;
 
   const body = await readJson<Body>(request);
   if (!body) return badRequest('요청을 읽지 못했어요.');

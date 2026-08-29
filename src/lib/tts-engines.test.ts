@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   GOOGLE_VOICES,
+  availableEngines,
   TYPECAST_VOICES,
+  forgetBlocked,
   isBlocked,
   looksBlocked,
   markBlocked,
@@ -25,6 +27,12 @@ beforeEach(() => {
   process.env.TYPECAST_API_KEY = 'test-typecast';
   process.env.GOOGLE_TTS_API_KEY = 'test-google';
   delete process.env.TTS_DAILY_LIMIT;
+  /*
+    막힘 기억은 모듈에 붙어 있어 테스트끼리 이어집니다.
+    한 테스트가 막아 둔 것이 다음 테스트의 순서를 뒤바꿔,
+    엉뚱한 곳에서 실패가 났습니다. 걸음마다 지우고 시작합니다.
+  */
+  forgetBlocked();
 });
 
 afterEach(() => {
@@ -58,6 +66,58 @@ describe('pickEngines — 쓸 수 있는 회사를 좋아하는 순서로', () =
     delete process.env.TYPECAST_API_KEY;
     delete process.env.GOOGLE_TTS_API_KEY;
     expect(pickEngines()).toEqual([]);
+  });
+});
+
+describe('부모가 회사를 골랐을 때', () => {
+  it('고른 쪽을 앞세운다', () => {
+    expect(이름(pickEngines('google'))).toEqual(['google', 'typecast']);
+    expect(이름(pickEngines('typecast'))).toEqual(['typecast', 'google']);
+  });
+
+  it('자동은 서버가 정한 순서 그대로', () => {
+    expect(이름(pickEngines('auto'))).toEqual(['typecast', 'google']);
+    expect(이름(pickEngines(null))).toEqual(['typecast', 'google']);
+    expect(이름(pickEngines())).toEqual(['typecast', 'google']);
+  });
+
+  it('**고른 쪽만 고집하지 않는다** — 다른 쪽이 목록에 남는다', () => {
+    /*
+      부모가 「Google 로 들을래요」라고 한 것은 소리의 취향이지
+      「안 되면 소리 없이 두세요」라는 뜻이 아닙니다.
+      걸러 내면 그 회사가 막힌 날 아이가 받아쓰기를 못 합니다.
+    */
+    expect(pickEngines('google')).toHaveLength(2);
+    expect(이름(pickEngines('google'))).toContain('typecast');
+  });
+
+  it('고른 회사가 막혀 있으면 성한 쪽이 먼저 나온다', () => {
+    markBlocked('google');
+    // 골랐어도 막힌 것은 뒤로 갑니다. 소리가 나는 것이 먼저입니다.
+    expect(이름(pickEngines('google'))).toEqual(['typecast', 'google']);
+  });
+
+  it('키가 없는 회사를 골라도 아무 일 없다', () => {
+    // 환경 변수에서 키가 빠지면 그 회사는 목록에 아예 없습니다.
+    delete process.env.TYPECAST_API_KEY;
+    expect(이름(pickEngines('typecast'))).toEqual(['google']);
+  });
+});
+
+describe('고를 수 있는 회사', () => {
+  it('키가 꽂힌 회사만 센다 — 없는 것을 고르게 두면 눌러도 안 바뀝니다', () => {
+    expect(availableEngines()).toEqual(['typecast', 'google']);
+    delete process.env.TYPECAST_API_KEY;
+    expect(availableEngines()).toEqual(['google']);
+  });
+
+  it('막힌 회사도 고를 수 있는 것으로 센다', () => {
+    /*
+      막힘은 10분짜리 기억입니다. 그동안 설정 화면에서 선택지가 사라졌다
+      다시 생기면, 부모는 자기가 뭘 잘못 눌렀나 싶습니다.
+    */
+    markBlocked('typecast');
+    expect(availableEngines()).toContain('typecast');
   });
 });
 

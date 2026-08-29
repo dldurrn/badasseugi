@@ -45,10 +45,25 @@ export interface FamilyRow {
   default_rate: number | null;
   default_write_mode: string | null;
   default_voice: string | null;
+  default_engine: string | null;
 }
 
 const CHILD_COLUMNS = 'id, nickname, avatar, pin_hash, rate, write_mode, voice';
-const FAMILY_COLUMNS = 'parent_pin_hash, default_rate, default_write_mode, default_voice';
+const FAMILY_COLUMNS =
+  'parent_pin_hash, default_rate, default_write_mode, default_voice, default_engine';
+/*
+  마이그레이션을 아직 안 돌린 곳을 위한 예전 칸 목록.
+
+  칸 이름을 대고 물었는데 그 칸이 없으면 **조회 전체가 실패합니다.**
+  그러면 속도·목소리·쓰기 방법까지 한꺼번에 못 읽어, 부모가 정해 둔 것이
+  전부 사라진 것처럼 보입니다 — 없는 칸 하나 때문에요.
+  `fromRow` 는 원래 「칸이 없으면 안 고른 것」으로 견디게 되어 있는데,
+  조회가 통째로 엎어지면 거기까지 가지도 못합니다.
+
+  그래서 한 번 더 물어봅니다. 배포와 마이그레이션의 순서에 앱이 매달리지 않게 합니다.
+*/
+const FAMILY_COLUMNS_LEGACY =
+  'parent_pin_hash, default_rate, default_write_mode, default_voice';
 
 /**
  * 지금 고른 자녀의 행.
@@ -79,8 +94,20 @@ export const activeChildRow = cache(async (): Promise<ChildRow | null> => {
 export const familyRow = cache(async (): Promise<FamilyRow | null> => {
   try {
     const supabase = await createClient();
-    const { data } = await supabase.from('families').select(FAMILY_COLUMNS).maybeSingle();
-    return (data as FamilyRow | null) ?? null;
+    const { data, error } = await supabase
+      .from('families')
+      .select(FAMILY_COLUMNS)
+      .maybeSingle();
+
+    if (!error) return (data as FamilyRow | null) ?? null;
+
+    // 새 칸이 아직 없는 곳(마이그레이션 전). 예전 칸만으로 다시 물어봅니다.
+    console.warn('[request] 가족 행 조회 실패, 예전 칸으로 다시 시도합니다', error.message);
+    const { data: old } = await supabase
+      .from('families')
+      .select(FAMILY_COLUMNS_LEGACY)
+      .maybeSingle();
+    return old ? ({ ...old, default_engine: null } as FamilyRow) : null;
   } catch (error) {
     console.error('[request] 가족 행을 읽지 못했습니다', error);
     return null;

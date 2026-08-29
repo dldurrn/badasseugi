@@ -213,6 +213,17 @@ export function isBlocked(name: EngineName): boolean {
   return (blockedUntil.get(name) ?? 0) > Date.now();
 }
 
+/**
+ * 막힘 기억을 지웁니다.
+ *
+ * 이 기억은 모듈에 붙어 있어 **테스트끼리도 이어집니다.**
+ * 한 테스트에서 막아 둔 것이 다음 테스트의 순서를 뒤바꿔,
+ * 엉뚱한 곳에서 실패가 납니다. 그래서 테스트가 걸음마다 이걸 부릅니다.
+ */
+export function forgetBlocked(): void {
+  blockedUntil.clear();
+}
+
 /** 오류 글에서 「막힘」을 가려냅니다. 일시적 실패와 달리 다시 눌러도 안 풀립니다. */
 export function looksBlocked(error: unknown): boolean {
   return error instanceof Error && /\b(401|403)\b/.test(error.message);
@@ -250,17 +261,40 @@ export function matchVoice(engine: Engine, requested: unknown): string {
  * Google 키가 멀쩡히 있는데도 브라우저 내장 음성으로 떨어졌고,
  * 사람이 환경 변수를 지워 줄 때까지 며칠이 그대로 갔습니다.
  */
-export function pickEngines(): Engine[] {
+export function pickEngines(preferred?: EngineName | 'auto' | null): Engine[] {
   const all = [typecastEngine(), googleEngine()].filter((e): e is Engine => e !== null);
   const 쓸수있는 = all.filter((e) => !isBlocked(e.name));
   const 막힌 = all.filter((e) => isBlocked(e.name));
+
+  /*
+    부모가 회사를 짚었으면 그쪽을 맨 앞에 둡니다.
+
+    **다만 고집하지는 않습니다.** 짚은 회사가 막히면 다른 쪽으로 넘어갑니다 —
+    부모가 「Google 로 들을래요」라고 해 둔 것은 소리의 취향이지
+    「안 되면 소리 없이 두세요」라는 뜻이 아닙니다.
+    그래서 걸러 내는 것이 아니라 순서만 바꿉니다.
+
+    키가 없는 회사를 짚었으면 목록에 아예 없으므로 저절로 무시됩니다.
+  */
+  const 앞으로 = (list: Engine[]) =>
+    preferred && preferred !== 'auto'
+      ? [...list.filter((e) => e.name === preferred), ...list.filter((e) => e.name !== preferred)]
+      : list;
+
   // 막힌 회사도 맨 뒤에 남겨 둡니다. 둘 다 막혔으면 그래도 한 번은 던져 봐야 합니다.
-  return [...쓸수있는, ...막힌];
+  return [...앞으로(쓸수있는), ...앞으로(막힌)];
+}
+
+/** 키가 꽂혀 있어 고를 수 있는 회사들. 설정 화면이 고를 거리를 그릴 때 씁니다. */
+export function availableEngines(): EngineName[] {
+  return [typecastEngine(), googleEngine()]
+    .filter((e): e is Engine => e !== null)
+    .map((e) => e.name);
 }
 
 /** 지금 쓰는 회사 하나. 목소리 목록처럼 「누구냐」만 필요한 곳에서 씁니다. */
-export function pickEngine(): Engine | null {
-  return pickEngines()[0] ?? null;
+export function pickEngine(preferred?: EngineName | 'auto' | null): Engine | null {
+  return pickEngines(preferred)[0] ?? null;
 }
 
 function typecastEngine(): Engine | null {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api';
-import { GOOGLE_VOICES, pickEngine, TYPECAST_VOICES } from '@/lib/tts-engines';
+import { readEnginePref } from '@/lib/settings-server';
+import { availableEngines, GOOGLE_VOICES, pickEngine, TYPECAST_VOICES } from '@/lib/tts-engines';
 
 /**
  * 이 계정에서 쓸 수 있는 한국어 목소리 목록.
@@ -25,11 +26,18 @@ export interface VoiceOption {
 }
 
 export async function GET() {
-  const engine = pickEngine();
-  if (!engine) return NextResponse.json({ voices: [], engine: null, defaultVoice: null });
-
+  /*
+    로그인 확인을 먼저 합니다. 부모가 고른 회사를 읽어야 하는데
+    그건 로그인한 뒤에야 알 수 있기 때문입니다.
+  */
   const auth = await requireUser();
   if (!auth.ok) return auth.response;
+
+  const pref = await readEnginePref();
+  const engine = pickEngine(pref);
+  if (!engine) {
+    return NextResponse.json({ voices: [], engine: null, defaultVoice: null, available: [] });
+  }
 
   /*
     회사가 무엇이든 **여자·남자 둘만** 보여 줍니다.
@@ -45,7 +53,12 @@ export async function GET() {
   */
   const list = engine.name === 'typecast' ? TYPECAST_VOICES : GOOGLE_VOICES;
   return NextResponse.json({
+    /** 지금 실제로 소리를 만드는 회사 */
     engine: engine.name,
+    /** 부모가 골라 둔 것. 'auto' 면 위의 engine 이 서버가 정한 결과입니다 */
+    pref,
+    /** 키가 꽂혀 있어 고를 수 있는 회사들. 하나뿐이면 화면이 고를 거리를 안 그립니다 */
+    available: availableEngines(),
     defaultVoice: engine.defaultVoice,
     voices: list.map((v) => ({ name: v.id, label: v.name, gender: v.gender })),
   });

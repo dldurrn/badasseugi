@@ -1,5 +1,8 @@
 import {
+  DEFAULT_ENGINE,
   DEFAULT_SETTINGS,
+  type EnginePref,
+  cleanEngine,
   fromRow,
   resolveSettings,
   type Settings,
@@ -33,6 +36,18 @@ export interface LoadedSettings {
   child: SettingsPatch;
 }
 
+/**
+ * 부모가 고른 회사. 소리를 만드는 라우트가 씁니다.
+ *
+ * 화면이 보낸 값을 쓰지 않는 이유는 설정 저장 때와 같습니다 —
+ * 어느 회사로 읽을지는 집의 선택이고, 나중에 요금제가 켜지면
+ * 「무료는 Google」 같은 규칙이 여기에 걸립니다. 화면이 정하게 두면 그때 구멍이 됩니다.
+ */
+export async function readEnginePref(): Promise<EnginePref> {
+  const row = await familyRow();
+  return cleanEngine(row?.default_engine) ?? DEFAULT_ENGINE;
+}
+
 export async function readSettings(): Promise<LoadedSettings> {
   const [가족, 자녀] = await Promise.all([familyRow(), activeChildRow()]);
 
@@ -52,7 +67,8 @@ export async function readSettings(): Promise<LoadedSettings> {
 
     저장은 하지 않습니다. 다시 타입캐스트로 돌아가면 원래 고른 목소리가 살아나야 합니다.
   */
-  const engine = pickEngines()[0] ?? null;
+  // 부모가 고른 회사를 반영해서 골라야, 화면에 켜지는 목소리가 실제로 날 소리와 같습니다.
+  const engine = pickEngines(family.engine)[0] ?? null;
   const 옮김 = (v: string | null | undefined) =>
     engine && v ? matchVoice(engine, v) : (v ?? null);
 

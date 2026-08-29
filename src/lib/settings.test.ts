@@ -8,6 +8,7 @@ import {
   fromRow,
   resolveSettings,
   toColumns,
+  cleanEngine,
 } from './settings';
 
 /**
@@ -128,18 +129,65 @@ describe('DB 칸 이름 — 층마다 다릅니다', () => {
   });
 
   it('fromRow 가 다시 읽어 온다', () => {
-    expect(fromRow({ default_rate: 0.85, default_write_mode: 'plain', default_voice: null }, 'family')).toEqual(
-      { rate: 0.85, writeMode: 'plain', voice: null },
-    );
+    expect(
+      fromRow({ default_rate: 0.85, default_write_mode: 'plain', default_voice: null }, 'family'),
+    ).toEqual({ rate: 0.85, writeMode: 'plain', voice: null, engine: null });
     expect(fromRow({ rate: 1, write_mode: 'wongoji', voice: 'tc_a' }, 'child')).toEqual({
       rate: 1,
       writeMode: 'wongoji',
       voice: 'tc_a',
+      // 회사 고르기는 집 단위라 아이 층에는 아예 없습니다.
+      engine: null,
     });
   });
 
   it('칸이 아직 없으면(마이그레이션 전) 전부 안 고른 것으로 본다', () => {
-    expect(fromRow({}, 'child')).toEqual({ rate: null, writeMode: null, voice: null });
+    expect(fromRow({}, 'child')).toEqual({
+      rate: null,
+      writeMode: null,
+      voice: null,
+      engine: null,
+    });
     expect(fromRow(null, 'family')).toEqual({});
+  });
+});
+
+describe('목소리 회사 고르기', () => {
+  it('아는 이름만 받는다', () => {
+    expect(cleanEngine('auto')).toBe('auto');
+    expect(cleanEngine('typecast')).toBe('typecast');
+    expect(cleanEngine('google')).toBe('google');
+  });
+
+  it('모르는 값은 안 고른 것으로 본다', () => {
+    // 예전에 쓰던 회사 이름이 남아 있어도 조용히 자동으로 돌아가야 합니다.
+    for (const bad of ['clova', 'openai', '', null, undefined, 1, {}]) {
+      expect(cleanEngine(bad), String(bad)).toBeNull();
+    }
+  });
+
+  it('집 단위라 부모 층에만 저장한다', () => {
+    expect(toColumns({ engine: 'google' }, 'family')).toEqual({ default_engine: 'google' });
+  });
+
+  it('아이 층으로 보내면 조용히 버린다', () => {
+    /*
+      children 에는 이 칸이 없습니다. 그대로 보내면 저장 전체가 실패해서,
+      목소리를 바꾸려던 아이가 아무것도 못 바꾸게 됩니다.
+    */
+    expect(toColumns({ engine: 'google', voice: 'tc_a' }, 'child')).toEqual({ voice: 'tc_a' });
+  });
+
+  it('화면이 보낸 것 중 아는 것만 남긴다', () => {
+    expect(cleanPatch({ engine: 'typecast' })).toEqual({ engine: 'typecast' });
+    expect(cleanPatch({ engine: 'clova' })).toEqual({ engine: null });
+    // 안 보낸 항목은 건드리지 않습니다.
+    expect(cleanPatch({ rate: 1 })).toEqual({ rate: 1 });
+  });
+
+  it('부모 행에서 읽어 온다', () => {
+    expect(fromRow({ default_engine: 'google' }, 'family').engine).toBe('google');
+    // 마이그레이션 전이라 칸이 없으면 안 고른 것입니다.
+    expect(fromRow({ default_rate: 1 }, 'family').engine).toBeNull();
   });
 });
