@@ -138,7 +138,9 @@ export async function listWrongNotes(
 
   let query = supabase
     .from('wrong_notes')
-    .select('id, module, ref_id, content, error_types, streak, last_correct_date, wrong_count')
+    .select(
+      'id, module, ref_id, content, error_types, streak, last_correct_date, wrong_count, twin_ref, twin_tries, last_wrong_input',
+    )
     .eq('child_id', childId)
     .order('updated_at', { ascending: false });
 
@@ -155,6 +157,9 @@ export async function listWrongNotes(
     streak: (row.streak as number | null) ?? 0,
     lastCorrectDate: (row.last_correct_date as string | null) ?? null,
     wrongCount: (row.wrong_count as number | null) ?? 1,
+    twinRef: (row.twin_ref as string | null) ?? null,
+    twinTries: (row.twin_tries as number | null) ?? 0,
+    lastWrongInput: (row.last_wrong_input as string | null) ?? null,
   }));
 }
 

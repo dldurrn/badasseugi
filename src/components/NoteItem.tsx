@@ -6,6 +6,7 @@ import type { Settings } from '@/lib/settings';
 import { NoteDeleteButton } from './NoteDeleteButton';
 import { Stars } from './Stars';
 import type { SpellingQuestion } from '@/data/spelling-bank';
+import { stepOf } from '@/lib/twin';
 import type { Module } from '@/lib/types';
 
 /**
@@ -20,6 +21,7 @@ export function NoteItem({
   question,
   childId,
   settings,
+  twin,
 }: {
   note: {
     id: string;
@@ -28,9 +30,13 @@ export function NoteItem({
     content: string;
     streak: number;
     wrongCount: number;
+    /** 두 번째 걸음. 없으면 예전처럼 원본을 두 번 풉니다 */
+    twinRef: string | null;
   };
   /** 맞춤법 오답이면 문제은행에서 찾은 문제 */
   question?: SpellingQuestion;
+  /** 짝 문제. 받아쓰기는 문장만, 맞춤법은 문제은행에서 찾은 문항까지 */
+  twin?: { content: string; question?: SpellingQuestion };
   /** 자녀 모드일 때만 값이 있습니다. 없으면 풀기 버튼을 감춥니다. */
   childId: string | null;
   settings: Settings;
@@ -93,6 +99,12 @@ export function NoteItem({
           refId={note.refId}
           content={note.content}
           question={question}
+          twin={twin}
+          /*
+            별을 하나 받아 둔 상태로 다시 열면 짝부터 이어 풉니다.
+            처음부터 풀리면 이미 맞힌 것을 또 풀게 되고, 그건 상이 아니라 벌입니다.
+          */
+          startStep={stepOf({ streak: note.streak, twinRef: note.twinRef })}
           settings={settings}
           onClose={() => setOpen(false)}
         />

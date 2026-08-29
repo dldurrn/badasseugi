@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { EmptyState } from '@/components/EmptyState';
 import { NoteItem } from '@/components/NoteItem';
+import { TwinFill } from '@/components/TwinFill';
 import { Stars } from '@/components/Stars';
 import { SPELLING_BANK } from '@/data/spelling-bank';
 import { listWrongNotes } from '@/lib/data';
@@ -27,11 +28,37 @@ export default async function NotesPage() {
   // 맞춤법 오답은 문제은행에서 원래 문제를 찾아야 그 자리에서 풀 수 있습니다.
   const questionFor = (refId: string) => SPELLING_BANK.find((q) => q.id === refId);
 
+  /*
+    짝 문제 — 오답노트의 두 번째 걸음.
+
+    같은 문장을 두 번 내면 찍기는 걸러도 **암기는 못 거릅니다.**
+    같은 규칙의 다른 문제를 내야 절대 원칙 5가 적어 둔 목적에 닿습니다.
+
+    맞춤법은 문제은행에서 찾기만 하면 되고(태그가 노트에 그대로 있습니다),
+    받아쓰기는 twin_ref 가 곧 문장이라 그대로 씁니다.
+    아직 없으면 undefined 를 넘겨 예전처럼 원본을 두 번 풀게 합니다.
+  */
+  const twinFor = (note: { module: 'dictation' | 'spelling'; twinRef: string | null }) => {
+    if (!note.twinRef) return undefined;
+    if (note.module === 'spelling') {
+      const q = questionFor(note.twinRef);
+      return q ? { content: q.prompt, question: q } : undefined;
+    }
+    return { content: note.twinRef };
+  };
+
   const countIn = (module: 'dictation' | 'spelling') =>
     active.filter((n) => n.module === module).length;
 
   return (
     <main className="page">
+      {/*
+        짝이 없는 노트를 조용히 채웁니다. 아무것도 그리지 않습니다 —
+        짝이 없어도 지금 바로 풀 수 있으니 아이가 기다릴 까닭이 없습니다.
+        자녀 화면에서만 부릅니다. 보호자는 목록을 보러 온 것이지 풀러 온 게 아닙니다.
+      */}
+      {isChild && child && <TwinFill />}
+
       <header className="mb-4 pt-4">
         <h1 className="display text-2xl font-bold">오답노트</h1>
         {child && (
@@ -114,6 +141,7 @@ export default async function NotesPage() {
                 key={note.id}
                 note={note}
                 question={note.module === 'spelling' ? questionFor(note.refId) : undefined}
+                twin={twinFor(note)}
                 childId={isChild && child ? child.id : null}
                 settings={settings.effective}
               />

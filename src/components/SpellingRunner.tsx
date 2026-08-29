@@ -36,7 +36,14 @@ export function SpellingRunner({
   starNotes,
 }: {
   childId: string;
-  questions: SpellingQuestion[];
+  /**
+   * 낼 문제들.
+   *
+   * `originRefId` 가 붙어 있으면 **짝 문제**입니다 — 화면에는 이 문항을 내지만
+   * 오답노트에는 원본의 id 로 기록합니다. 짝의 id 로 적으면 그것이
+   * 새 오답노트가 되어 목록이 끝없이 불어납니다.
+   */
+  questions: Array<SpellingQuestion & { originRefId?: string }>;
   kind: SpellingKind | null;
   kindLabel: string;
   mode: Mode;
@@ -106,7 +113,8 @@ export function SpellingRunner({
     const nextOutcomes: OutcomePayload[] = [
       ...outcomes,
       {
-        refId: current.id,
+        refId: current.originRefId ?? current.id,
+        wasTwin: current.originRefId !== undefined,
         content: current.prompt,
         correct: choice === current.answer,
         // 맞춤법은 오류 '유형'이 아니라 헷갈리는 말 자체가 약점입니다.

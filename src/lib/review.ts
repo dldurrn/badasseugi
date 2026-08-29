@@ -30,15 +30,40 @@ export interface WrongNote {
   /** 마지막으로 별을 얻은 날짜 (YYYY-MM-DD). 아직 없으면 null */
   lastCorrectDate: string | null;
   wrongCount: number;
+
+  /**
+   * 짝 문제의 식별자. `refId` 와 같은 규칙입니다 —
+   * 받아쓰기는 문장 원문, 맞춤법은 문제은행 문항 id.
+   *
+   * 비어 있으면 아직 못 만들었거나 만들다 실패한 것입니다.
+   * 그때는 예전처럼 **원본을 두 번** 풀어 졸업합니다(`stepOf`).
+   */
+  twinRef: string | null;
+  /** 짝을 만들어 보려 한 횟수. 될 리 없는 것을 계속 만들지 않기 위해 */
+  twinTries: number;
+  /** 아이가 마지막으로 잘못 쓴 것. 좋은 짝을 만들 때와 리포트에 씁니다 */
+  lastWrongInput: string | null;
 }
 
 /** 한 문제에 대한 세션 결과 */
 export interface ItemOutcome {
   module: 'dictation' | 'spelling';
+  /**
+   * **언제나 원본 노트의 식별자**입니다.
+   *
+   * 짝을 풀 때도 원본의 refId 를 보냅니다. 짝의 것을 보내면
+   * `applySessionOutcomes` 가 그것을 **새 오답노트로 만들어 버립니다** —
+   * 그러면 노트가 끝없이 불어나 「치울 수 있는 목록」이 아니게 됩니다.
+   * 짝은 그 노트의 두 번째 걸음이지 독립된 문제가 아닙니다.
+   */
   refId: string;
   content: string;
   correct: boolean;
   errorTypes: string[];
+  /** 짝을 푼 결과인가. 별 규칙은 같고, 틀렸을 때 짝을 버릴지가 갈립니다 */
+  wasTwin?: boolean;
+  /** 아이가 실제로 쓴 것. 다음 짝을 만들 때 씁니다 */
+  input?: string;
 }
 
 export interface ApplyResult {
@@ -122,6 +147,10 @@ export function applySessionOutcomes(
     } else {
       prev.correct = prev.correct && o.correct;
       prev.errorTypes = Array.from(new Set([...prev.errorTypes, ...o.errorTypes]));
+      // 한 세션에 원본과 짝을 잇달아 풀면 둘 다 여기로 옵니다.
+      // 짝을 풀었다는 사실과 마지막으로 쓴 것은 나중 것을 남깁니다.
+      prev.wasTwin = prev.wasTwin || o.wasTwin;
+      if (o.input !== undefined) prev.input = o.input;
     }
   }
 
@@ -143,7 +172,15 @@ export function applySessionOutcomes(
       note.streak += 1;
       note.lastCorrectDate = today;
       starsEarned += 1;
-      if (isGraduated(note)) graduated += 1;
+      /*
+        짝까지 맞혔으면 졸업입니다. 다 쓴 짝은 비웁니다 —
+        남겨 두면 나중에 이 문제를 또 틀렸을 때 **예전에 이미 푼 짝**이 다시 나옵니다.
+      */
+      if (isGraduated(note)) {
+        graduated += 1;
+        note.twinRef = null;
+        note.twinTries = 0;
+      }
       continue;
     }
 
@@ -158,6 +195,9 @@ export function applySessionOutcomes(
         streak: 0,
         lastCorrectDate: null,
         wrongCount: 1,
+        twinRef: null,
+        twinTries: 0,
+        lastWrongInput: outcome.input ?? null,
       });
       added += 1;
     } else {
@@ -168,6 +208,20 @@ export function applySessionOutcomes(
       note.errorTypes = Array.from(
         new Set([...note.errorTypes, ...outcome.errorTypes]),
       );
+      if (outcome.input !== undefined) note.lastWrongInput = outcome.input;
+
+      /*
+        **짝에서 틀렸으면 그 짝을 버립니다.**
+
+        남겨 두면 다음 판에 같은 짝이 또 나옵니다. 그러면 아이가 원본도 외우고
+        짝도 외우게 되어, 「같은 문장 두 번」과 다를 바가 없어집니다.
+        원본에서 틀렸을 때는 짝이 아직 안 쓰였으니 그대로 둡니다 —
+        멀쩡한 것을 버리면 만드는 값만 두 번 듭니다.
+      */
+      if (outcome.wasTwin) {
+        note.twinRef = null;
+        note.twinTries = 0;
+      }
     }
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { badRequest, readJson, requireUser } from '@/lib/api';
+import { fillTwins } from '@/lib/twin-server';
 import { isBuiltinSetId } from '@/data/dictation-bank';
 import { scoreOf } from '@/lib/grading';
 import {
@@ -64,6 +65,9 @@ export async function POST(request: Request) {
       errorTypes: Array.isArray(o.errorTypes)
         ? o.errorTypes.filter((t): t is string => typeof t === 'string').slice(0, 8)
         : [],
+      wasTwin: o.wasTwin === true,
+      // 아이가 쓴 것. 받아쓰기 한 문장 길이를 넘을 수 없습니다.
+      input: typeof o.input === 'string' ? o.input.slice(0, 200) : undefined,
     });
   }
 
@@ -120,7 +124,9 @@ export async function POST(request: Request) {
   // `in(...)` 으로 거르면 URL이 너무 길어질 수 있습니다.
   const { data: noteRows } = await supabase
     .from('wrong_notes')
-    .select('id, module, ref_id, content, error_types, streak, last_correct_date, wrong_count')
+    .select(
+      'id, module, ref_id, content, error_types, streak, last_correct_date, wrong_count, twin_ref, twin_tries, last_wrong_input',
+    )
     .eq('child_id', childId)
     .eq('module', module);
 
@@ -133,6 +139,9 @@ export async function POST(request: Request) {
     streak: (row.streak as number | null) ?? 0,
     lastCorrectDate: (row.last_correct_date as string | null) ?? null,
     wrongCount: (row.wrong_count as number | null) ?? 1,
+    twinRef: (row.twin_ref as string | null) ?? null,
+    twinTries: (row.twin_tries as number | null) ?? 0,
+    lastWrongInput: (row.last_wrong_input as string | null) ?? null,
   }));
 
   const applied = applySessionOutcomes(existing, clean, toDateKeyInSeoul());
@@ -152,11 +161,29 @@ export async function POST(request: Request) {
         streak: n.streak,
         last_correct_date: n.lastCorrectDate,
         wrong_count: n.wrongCount,
+        twin_ref: n.twinRef,
+        twin_tries: n.twinTries,
+        last_wrong_input: n.lastWrongInput,
         updated_at: new Date().toISOString(),
       })),
       { onConflict: 'child_id,module,ref_id' },
     );
     if (noteError) console.error('[sessions] 오답노트 갱신 실패', noteError);
+
+    /*
+      짝 문제를 **미리** 만들어 둡니다.
+
+      아이가 원본을 맞힌 그 자리에서 만들면 AI 를 기다리느라 2~5초 멈춥니다.
+      지금 만들어 두면 아이가 오답노트로 돌아오는 것은 빨라야 몇 분 뒤입니다.
+      문장별로 소리를 미리 담아 두는 것과 같은 원리입니다.
+
+      **기다리지 않습니다.** 짝이 없어도 예전처럼 원본을 두 번 풀어 졸업하므로,
+      이것 때문에 세션 저장이 늦어지거나 실패하면 안 됩니다.
+      맞춤법은 문제은행에서 고르는 것이라 원가도 0원이고 거의 즉시 끝납니다.
+    */
+    void fillTwins(supabase, childId, applied.notes).catch((e) =>
+      console.error('[sessions] 짝 만들기 실패', e),
+    );
   }
 
   /* 3) 보상 — 시험 모드를 끝까지 마쳤을 때만 --------------------------- */

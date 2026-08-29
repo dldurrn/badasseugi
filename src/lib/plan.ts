@@ -29,8 +29,17 @@
  *
  *   사진으로 문제 넣기가 가장 좋은 유료 기능입니다.
  *     부모가 가장 아쉬워하는 시간을 삽니다 — 문제지 한 장 타이핑에 10분.
- *     유일하게 진짜 원가가 붙고, 없어도 앱이 성립하며(직접 입력이 있으니),
+ *     진짜 원가가 붙고, 없어도 앱이 성립하며(직접 입력이 있으니),
  *     무엇보다 **아이 경험을 건드리지 않습니다.**
+ *
+ *   오답노트는 여전히 못 잠급니다. 잠글 수 있는 것은 **AI 가 짝 문장을 만들어 주는 것** 하나입니다.
+ *     헷갈리기 쉬워 또박또박 적어 둡니다 —
+ *       · 무료도 오답노트를 씁니다. 원본으로 별 두 개를 모아 졸업합니다. 오늘과 똑같이.
+ *       · 맞춤법 짝도 무료입니다. 문제은행에서 고르는 것이라 원가가 0원입니다.
+ *         0원짜리를 잠그면 원고지를 잠그는 것과 같은 부끄러움입니다.
+ *       · **받아쓰기 짝만** 유료입니다. AI 를 부르는 유일한 자리이고,
+ *         이건 오늘 있는 것을 빼앗는 게 아니라 **얹는 것**입니다.
+ *     사진 넣기를 유료로 둔 것과 같은 기준입니다 — 원가가 붙는 것만.
  */
 
 export type Plan = 'free' | 'paid';
@@ -52,6 +61,13 @@ export interface Limits {
   photoInput: boolean;
   /** 리포트를 몇 주까지 거슬러 보나. null 이면 전부 */
   reportWeeks: number | null;
+  /**
+   * 오답노트의 짝 문장을 **AI 로 만들어 주기**(받아쓰기).
+   *
+   * 오답노트 자체가 아닙니다. 이게 꺼져 있어도 아이는 원본으로 별 두 개를 모아 졸업하고,
+   * 맞춤법 짝은 문제은행에서 그대로 나옵니다.
+   */
+  twinSentences: boolean;
 }
 
 export const LIMITS: Record<Plan, Limits> = {
@@ -59,8 +75,14 @@ export const LIMITS: Record<Plan, Limits> = {
     하루 2세션은 넉넉합니다. 매일 시키는 집도 보통 하루 1세션입니다.
     리포트 1주는 「이번 주」만 — 지난주와 견주는 것이 유료의 값어치입니다.
   */
-  free: { sessionsPerDay: 2, children: 1, photoInput: false, reportWeeks: 1 },
-  paid: { sessionsPerDay: null, children: 4, photoInput: true, reportWeeks: null },
+  free: { sessionsPerDay: 2, children: 1, photoInput: false, reportWeeks: 1, twinSentences: false },
+  paid: {
+    sessionsPerDay: null,
+    children: 4,
+    photoInput: true,
+    reportWeeks: null,
+    twinSentences: true,
+  },
 };
 
 /**

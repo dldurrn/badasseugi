@@ -58,8 +58,32 @@ describe('절대 잠그지 않는 것', () => {
       목록에 없다는 것이 곧 「잠글 수 없다」는 뜻입니다.
       나중에 누가 여기에 wongoji: false 를 더하려 하면 이 테스트가 막습니다 —
       원고지는 제품의 정체성이고 원가도 0원입니다.
+
+      `twinSentences` 가 여기 있는 것은 오답노트를 잠근다는 뜻이 **아닙니다.**
+      그건 「AI 가 받아쓰기 짝 문장을 만들어 주는 것」 하나이고,
+      꺼져 있어도 아이는 원본으로 별 두 개를 모아 졸업합니다(아래 테스트가 지킵니다).
     */
     const 잠글수있는것 = Object.keys(LIMITS.free).sort();
-    expect(잠글수있는것).toEqual(['children', 'photoInput', 'reportWeeks', 'sessionsPerDay']);
+    expect(잠글수있는것).toEqual([
+      'children',
+      'photoInput',
+      'reportWeeks',
+      'sessionsPerDay',
+      'twinSentences',
+    ]);
+  });
+
+  it('무료에서도 오답노트가 그대로 돈다 — 짝만 없을 뿐', () => {
+    /*
+      여기가 이 항목의 안전선입니다.
+      짝이 없으면 예전처럼 원본을 두 번 풀어 졸업합니다(twin.ts 의 stepOf).
+      무료 사용자에게 **더 나쁜 학습 도구**를 주는 것이 아니라,
+      유료에 한 겹을 얹는 것이어야 합니다.
+    */
+    expect(LIMITS.free.twinSentences).toBe(false);
+    expect(LIMITS.paid.twinSentences).toBe(true);
+    // 오답노트를 통째로 끄는 스위치는 어디에도 없습니다.
+    expect(Object.keys(LIMITS.free)).not.toContain('wrongNotes');
+    expect(Object.keys(LIMITS.free)).not.toContain('notes');
   });
 });

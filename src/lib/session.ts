@@ -12,11 +12,19 @@ import type { Mode, Module } from '@/lib/types';
  */
 
 export interface OutcomePayload {
-  /** 오답노트 참조용 — 받아쓰기는 문장 원문, 맞춤법은 문제 id */
+  /**
+   * 오답노트 참조용 — 받아쓰기는 문장 원문, 맞춤법은 문제 id.
+   * **짝 문제를 풀 때도 원본의 것을 보냅니다.** 짝의 것을 보내면 그것이
+   * 새 오답노트가 되어 목록이 끝없이 불어납니다.
+   */
   refId: string;
   content: string;
   correct: boolean;
   errorTypes: string[];
+  /** 짝 문제를 푼 결과인가. 틀렸을 때 그 짝을 버릴지가 갈립니다 */
+  wasTwin?: boolean;
+  /** 아이가 실제로 쓴 것. 다음 짝을 겨눠 만들 때 씁니다 */
+  input?: string;
 }
 
 export interface CompleteSessionRequest {

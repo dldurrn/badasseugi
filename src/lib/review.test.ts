@@ -150,9 +150,9 @@ describe('오답노트: 모듈 구분', () => {
 
 describe('오답노트: 조회 헬퍼', () => {
   const build = (): WrongNote[] => [
-    { id: '1', module: 'dictation', refId: 'a', content: 'a', errorTypes: ['batchim'], streak: 0, lastCorrectDate: null, wrongCount: 1 },
-    { id: '2', module: 'dictation', refId: 'b', content: 'b', errorTypes: ['spacing'], streak: 1, lastCorrectDate: '2026-01-05', wrongCount: 1 },
-    { id: '3', module: 'dictation', refId: 'c', content: 'c', errorTypes: ['batchim'], streak: 2, lastCorrectDate: '2026-01-04', wrongCount: 2 },
+    { id: '1', module: 'dictation', refId: 'a', content: 'a', errorTypes: ['batchim'], streak: 0, lastCorrectDate: null, wrongCount: 1, twinRef: null, twinTries: 0, lastWrongInput: null },
+    { id: '2', module: 'dictation', refId: 'b', content: 'b', errorTypes: ['spacing'], streak: 1, lastCorrectDate: '2026-01-05', wrongCount: 1, twinRef: null, twinTries: 0, lastWrongInput: null },
+    { id: '3', module: 'dictation', refId: 'c', content: 'c', errorTypes: ['batchim'], streak: 2, lastCorrectDate: '2026-01-04', wrongCount: 2, twinRef: null, twinTries: 0, lastWrongInput: null },
   ];
 
   it('졸업하지 않은 문제만 골라낸다', () => {
@@ -197,5 +197,112 @@ describe('날짜 키', () => {
   it('YYYY-MM-DD 형식이며 한 자리 월/일을 0으로 채운다', () => {
     expect(toDateKey(new Date(2026, 0, 5))).toBe('2026-01-05');
     expect(toDateKey(new Date(2026, 11, 25))).toBe('2026-12-25');
+  });
+});
+
+describe('짝 문제 — 두 번째 걸음', () => {
+  const 노트 = (over: Partial<WrongNote> = {}): WrongNote => ({
+    id: 'dictation:닭이 울어요',
+    module: 'dictation',
+    refId: '닭이 울어요',
+    content: '닭이 울어요',
+    errorTypes: ['batchim'],
+    streak: 0,
+    lastCorrectDate: null,
+    wrongCount: 1,
+    twinRef: '흙을 만졌어요',
+    twinTries: 0,
+    lastWrongInput: '닥이 울어요',
+    ...over,
+  });
+
+  const 결과 = (over: Partial<ItemOutcome> = {}): ItemOutcome => ({
+    module: 'dictation',
+    refId: '닭이 울어요',
+    content: '닭이 울어요',
+    correct: true,
+    errorTypes: [],
+    ...over,
+  });
+
+  it('짝을 맞히면 졸업하고, 다 쓴 짝은 비운다', () => {
+    /*
+      남겨 두면 나중에 이 문제를 또 틀렸을 때 예전에 이미 푼 짝이 다시 나옵니다.
+    */
+    const r = applySessionOutcomes(
+      [노트({ streak: 1 })],
+      [결과({ wasTwin: true, content: '흙을 만졌어요' })],
+      '2026-01-10',
+    );
+    expect(r.graduated).toBe(1);
+    expect(r.notes[0].streak).toBe(2);
+    expect(r.notes[0].twinRef).toBeNull();
+  });
+
+  it('짝에서 틀리면 별이 0이 되고 **그 짝을 버린다**', () => {
+    /*
+      짝을 남겨 두면 다음 판에 같은 짝이 또 나옵니다.
+      그러면 아이가 원본도 외우고 짝도 외워, 「같은 문장 두 번」과 다를 바가 없어집니다.
+    */
+    const r = applySessionOutcomes(
+      [노트({ streak: 1 })],
+      [결과({ correct: false, wasTwin: true, content: '흙을 만졌어요', input: '흑을 만졌어요' })],
+      '2026-01-10',
+    );
+    expect(r.notes[0].streak).toBe(0);
+    expect(r.notes[0].twinRef).toBeNull();
+    expect(r.notes[0].twinTries).toBe(0);
+    expect(r.notes[0].lastWrongInput).toBe('흑을 만졌어요');
+  });
+
+  it('원본에서 틀리면 짝은 그대로 둔다 — 아직 안 쓴 것이다', () => {
+    // 멀쩡한 것을 버리면 만드는 값만 두 번 듭니다.
+    const r = applySessionOutcomes(
+      [노트({ streak: 0 })],
+      [결과({ correct: false, input: '닥이 울어요' })],
+      '2026-01-10',
+    );
+    expect(r.notes[0].streak).toBe(0);
+    expect(r.notes[0].twinRef).toBe('흙을 만졌어요');
+  });
+
+  it('짝을 풀어도 **새 노트가 생기지 않는다**', () => {
+    /*
+      여기가 이 기능에서 제일 조심할 자리입니다.
+      짝의 refId 를 보내면 그것이 독립된 오답노트가 되어 목록이 끝없이 불어납니다.
+      짝은 그 노트의 두 번째 걸음이지 별개의 문제가 아닙니다.
+    */
+    const r = applySessionOutcomes(
+      [노트({ streak: 1 })],
+      [결과({ correct: false, wasTwin: true, content: '흙을 만졌어요' })],
+      '2026-01-10',
+    );
+    expect(r.notes).toHaveLength(1);
+    expect(r.added).toBe(0);
+  });
+
+  it('새로 생긴 노트는 짝이 없고, 아이가 쓴 것을 담는다', () => {
+    const r = applySessionOutcomes(
+      [],
+      [결과({ correct: false, errorTypes: ['batchim'], input: '닥이 울어요' })],
+      '2026-01-10',
+    );
+    expect(r.notes[0].twinRef).toBeNull();
+    expect(r.notes[0].twinTries).toBe(0);
+    expect(r.notes[0].lastWrongInput).toBe('닥이 울어요');
+  });
+
+  it('한 세션에서 원본과 짝을 잇달아 풀어도 별은 규칙대로 하나만 오른다', () => {
+    /*
+      절대 원칙 5 는 그대로입니다. 같은 문제가 한 세션에 여러 번 나와도 한 번만 반영합니다.
+      두 걸음을 한 자리에서 이어 풀어도 이 규칙은 안 바뀝니다.
+    */
+    const r = applySessionOutcomes(
+      [노트({ streak: 0 })],
+      [결과(), 결과({ wasTwin: true, content: '흙을 만졌어요' })],
+      '2026-01-10',
+    );
+    expect(r.starsEarned).toBe(1);
+    expect(r.notes[0].streak).toBe(1);
   });
 });

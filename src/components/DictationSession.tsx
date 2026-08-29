@@ -35,14 +35,26 @@ import type { Mode } from '@/lib/types';
  */
 
 export interface SessionItem {
-  /** 오답노트 참조용 식별자 — 받아쓰기는 문장 원문 */
+  /**
+   * 오답노트 참조용 식별자 — 받아쓰기는 문장 원문.
+   * **짝 문장을 낼 때도 원본의 것**입니다. 짝의 것을 보내면 새 오답노트가 생깁니다.
+   */
   refId: string;
   sentence: string;
+  /**
+   * 이 자리에 원본 대신 **짝 문장**을 냈는가.
+   * 오답노트 몰아 풀기에서 별을 하나 받아 둔 문제에 붙습니다.
+   */
+  isTwin?: boolean;
 }
 
 export interface SessionOutcome {
   refId: string;
   content: string;
+  /** 짝 문장을 푼 결과인가. 틀렸을 때 그 짝을 버릴지가 갈립니다 */
+  wasTwin?: boolean;
+  /** 아이가 실제로 쓴 것. 다음 짝을 겨눠 만들 때 씁니다 */
+  input?: string;
   correct: boolean;
   errorTypes: string[];
 }
@@ -173,6 +185,8 @@ export function DictationSession({
         content: current.sentence,
         correct: result.correct,
         errorTypes: result.errorTypes,
+        wasTwin: current.isTwin === true,
+        input: typed,
       },
     ];
 

@@ -8,6 +8,7 @@ import { listWrongNotes } from '@/lib/data';
 import { readActiveChild } from '@/lib/profile-server';
 import { readSettings } from '@/lib/settings-server';
 import { isGraduated, type WrongNote } from '@/lib/review';
+import { stepOf } from '@/lib/twin';
 import type { Module } from '@/lib/types';
 
 export const metadata = { title: '오답 이어서 풀기 · 받아쓰기 공책' };
@@ -67,11 +68,27 @@ export default async function NotesPracticePage({
 
   if (pool.length === 0) return empty;
 
+  /*
+    별을 하나 받아 둔 문제에는 **원본 대신 짝**을 냅니다.
+
+    여기서도 두 번째는 다른 문제여야 합니다 — 같은 것을 두 번 내면
+    찍기는 걸러도 암기는 못 거릅니다(절대 원칙 5가 적어 둔 목적).
+    몰아 푸는 자리라 한 문제를 두 걸음 이어 풀지는 않습니다.
+    원본을 맞히면 별 하나를 받고, 짝은 **다음 판에** 나옵니다.
+  */
+  const 낼것 = (n: WrongNote) => stepOf(n);
+
   if (module === 'spelling') {
     // 문제은행에서 사라진 문제(id 변경 등)는 낼 수 없으니 걸러 냅니다.
     const questions = pool
-      .map((n) => SPELLING_BANK.find((q) => q.id === n.refId))
-      .filter((q): q is (typeof SPELLING_BANK)[number] => Boolean(q));
+      .map((n) => {
+        const ref = 낼것(n) === 'twin' && n.twinRef ? n.twinRef : n.refId;
+        const q = SPELLING_BANK.find((x) => x.id === ref);
+        if (!q) return null;
+        // 짝을 낼 때도 기록은 원본의 id 로 남깁니다.
+        return ref === n.refId ? q : { ...q, originRefId: n.refId };
+      })
+      .filter((q): q is NonNullable<typeof q> => Boolean(q));
 
     if (questions.length === 0) return empty;
 
@@ -97,7 +114,11 @@ export default async function NotesPracticePage({
       key={`notes-dictation-${r ?? 'first'}`}
       childId={child.id}
       settings={settings.effective}
-      items={pool.map((n) => ({ refId: n.refId, sentence: n.content }))}
+      items={pool.map((n) => {
+        const twin = 낼것(n) === 'twin' && n.twinRef;
+        // refId 는 언제나 원본입니다. 화면에 내는 문장만 갈립니다.
+        return { refId: n.refId, sentence: twin ? n.twinRef! : n.content, isTwin: Boolean(twin) };
+      })}
       mode="practice"
       title="받아쓰기 오답 연습"
       setId={null}

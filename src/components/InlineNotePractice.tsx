@@ -10,6 +10,7 @@ import { saveSession } from '@/lib/save-session';
 import { initSfx, sfx } from '@/lib/sfx';
 import { SpeechController } from '@/lib/tts';
 import { appSpeech, setActiveVoice } from '@/lib/tts-app';
+import type { TwinStep } from '@/lib/twin';
 import type { Module } from '@/lib/types';
 import { SENTENCE_MAX } from '@/lib/sets';
 import { padToGrid, toCells, writingToText } from '@/lib/wongoji';
@@ -31,15 +32,28 @@ import { WongojiSheet } from './WongojiSheet';
  *   별과 졸업은 그대로 반영됩니다.
  */
 
-type Phase = 'writing' | 'confirming' | 'done';
+/**
+ * `bridge` 는 **원본을 맞히고 짝으로 넘어가기 직전**입니다.
+ * 곧바로 다음 문제를 들이밀지 않고 한 박자 둡니다 —
+ * 방금 맞혔다는 것을 알고 넘어가야 두 번째가 벌처럼 느껴지지 않습니다.
+ */
+type Phase = 'writing' | 'confirming' | 'bridge' | 'done';
 
 interface Props {
   childId: string;
   module: Module;
+  /** **언제나 원본 노트의 것**입니다. 짝을 풀 때도 이 값을 서버에 보냅니다 */
   refId: string;
   content: string;
   /** 맞춤법일 때만. 문제은행에서 찾아 넘겨 주세요. */
   question?: SpellingQuestion;
+  /**
+   * 두 번째 걸음. 없으면 예전처럼 **원본을 두 번** 풀어 졸업합니다.
+   * (아직 못 만들었거나 만들다 실패한 경우입니다)
+   */
+  twin?: { content: string; question?: SpellingQuestion };
+  /** 별을 하나 받아 둔 상태로 다시 열면 짝부터 시작합니다 */
+  startStep?: TwinStep;
   onClose: () => void;
   /** 서버가 읽어 내려준 값 */
   settings: Settings;
@@ -49,13 +63,23 @@ export function InlineNotePractice({
   childId,
   module,
   refId,
-  content,
-  question,
+  content: origin,
+  question: originQuestion,
+  twin,
+  startStep,
   onClose,
   settings,
 }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>('writing');
+  const [step, setStep] = useState<TwinStep>(twin ? (startStep ?? 'origin') : 'origin');
+
+  /*
+    지금 걸음에 맞는 문제를 여기서 한 번만 정합니다.
+    아래 화면들은 **어느 걸음인지 몰라도** 됩니다 — 듣기도, 채점도, 그리기도 그대로입니다.
+  */
+  const content = step === 'twin' && twin ? twin.content : origin;
+  const question = step === 'twin' && twin ? twin.question : originQuestion;
   const [typed, setTyped] = useState('');
   const [choice, setChoice] = useState<string | null>(null);
   const [result, setResult] = useState<GradeResult | null>(null);
@@ -131,7 +155,22 @@ export function InlineNotePractice({
         childId,
         module,
         mode: 'practice',
-        outcomes: [{ refId, content, correct: isCorrect, errorTypes }],
+        /*
+          refId 는 **언제나 원본의 것**입니다. 짝의 것을 보내면 서버가 그것을
+          새 오답노트로 만들어 버려 목록이 끝없이 불어납니다 —
+          짝은 이 노트의 두 번째 걸음이지 별개의 문제가 아닙니다.
+        */
+        outcomes: [
+          {
+            refId,
+            content,
+            correct: isCorrect,
+            errorTypes,
+            wasTwin: step === 'twin',
+            // 다음 짝을 겨눠 만들려면 아이가 무엇을 썼는지 알아야 합니다.
+            input: answer,
+          },
+        ],
         // 복습 한 번은 리포트의 평균 점수를 흔들지 않게 기록에서 뺍니다.
         logAttempt: false,
       });
@@ -143,7 +182,13 @@ export function InlineNotePractice({
       else if (!isCorrect) setNote('별이 처음으로 돌아갔어요. 다시 모아 봐요.');
       else setNote(null);
 
-      setPhase('done');
+      /*
+        원본을 맞혔고 짝이 있으면 **닫지 않고 이어서** 풉니다.
+        여기서 닫아 버리면 아이가 목록에서 같은 항목을 다시 찾아 눌러야 하는데,
+        방금 맞힌 것을 또 누르라는 것이 되어 이상합니다(절대 원칙 10).
+      */
+      if (isCorrect && step === 'origin' && twin) setPhase('bridge');
+      else setPhase('done');
     } catch (e) {
       setError(e instanceof Error ? e.message : '저장하지 못했어요.');
       setPhase('done');
@@ -158,6 +203,57 @@ export function InlineNotePractice({
     router.refresh();
     onClose();
   };
+
+  /** 짝으로 넘어갑니다. 방금 푼 것은 지우고 처음처럼 시작합니다. */
+  const goTwin = () => {
+    speech.stop();
+    setStep('twin');
+    setTyped('');
+    setChoice(null);
+    setResult(null);
+    setNote(null);
+    setError(null);
+    setPhase('writing');
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  /* ------------------------------------------------- 짝으로 넘어가기 전 */
+
+  if (phase === 'bridge') {
+    return (
+      <div className="rise-in surface note--writing p-4">
+        <p className="display text-base font-bold" style={{ color: 'var(--grid-deep)', margin: 0 }}>
+          맞았어요! 별 하나 ★
+        </p>
+        {/*
+          왜 다른 문장이 나오는지 아이가 알아야 합니다.
+          모르면 시험 문제가 바뀐 것으로 느끼고, 맞힌 상이 벌처럼 됩니다.
+        */}
+        <p
+          className="mt-1.5 text-sm leading-relaxed"
+          style={{ color: 'var(--ink-soft)', margin: '6px 0 0' }}
+        >
+          이번엔 <b style={{ color: 'var(--ink)' }}>다른 문장</b>으로 한 번 더 해 봐요.
+          {module === 'spelling' ? ' 같은 규칙의 다른 문제예요.' : ' 방금 것과 비슷한 문장이에요.'}
+          <br />
+          이것까지 맞히면 졸업이에요!
+        </p>
+        <div className="mt-4 flex gap-2">
+          <button className="btn btn-primary flex-1 justify-center" onClick={goTwin} autoFocus>
+            해 볼래요
+          </button>
+          {/*
+            나가도 별 하나는 남습니다. 다음에 열면 짝부터 이어서 풉니다 —
+            중도 이탈로 기록을 버리는 것(절대 원칙 2)은 시험 세션 이야기이고,
+            여기는 이미 서버에 별이 저장된 뒤입니다.
+          */}
+          <button className="btn btn-secondary" onClick={close}>
+            나중에
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   /* --------------------------------------------------------------- 결과 */
 
