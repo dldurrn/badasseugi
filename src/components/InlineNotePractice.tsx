@@ -219,9 +219,18 @@ export function InlineNotePractice({
 
   /* ------------------------------------------------- 짝으로 넘어가기 전 */
 
+  /*
+    쓰기·확인·결과와 **같은 껍데기**입니다 — 카드 안에 줄 하나 긋고 이어 붙입니다.
+
+    처음에는 여기에 `surface note--writing` 을 줬다가 화면이 무너졌습니다.
+    `.note--writing` 은 **카드째 넓히는** 것이라 NoteItem 의 `<li>` 가 이미 쓰고 있습니다.
+    넓혀진 카드 안에서 또 넓히니 상자가 카드 밖으로 밀려났습니다.
+
+    이 걸음만 다른 껍데기를 쓸 까닭이 없었습니다. 나머지 셋과 같게 두면 그만입니다.
+  */
   if (phase === 'bridge') {
     return (
-      <div className="rise-in surface note--writing p-4">
+      <div className="rise-in mt-3 border-t pt-3" style={{ borderColor: 'var(--rule)' }}>
         <p className="display text-base font-bold" style={{ color: 'var(--grid-deep)', margin: 0 }}>
           맞았어요! 별 하나 ★
         </p>

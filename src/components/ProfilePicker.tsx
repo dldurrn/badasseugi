@@ -193,7 +193,14 @@ export function ProfilePicker({
               <button
                 onClick={() => (child.hasPin ? setLocked(child) : enter(child, ''))}
                 disabled={busy}
-                className="surface flex w-full flex-col items-center gap-1.5 px-3 py-6"
+                /*
+                  h-full 이 없으면 **비밀번호를 건 아이만 카드가 커집니다.**
+                  「🔒 비밀번호 있어요」 한 줄 때문에 속 내용의 키가 달라지는데,
+                  칸(li)은 늘어나도 그 안의 버튼은 제 키만큼만 차지하기 때문입니다.
+                  나란히 놓인 얼굴의 크기가 다르면 하나가 잘못된 것처럼 보입니다.
+                  「프로필 추가」 칸은 처음부터 h-full 이라 이것만 어긋나 있었습니다.
+                */
+                className="surface flex h-full w-full flex-col items-center justify-center gap-1.5 px-3 py-6"
               >
                 <span className="text-[44px] leading-none" aria-hidden="true">
                   {child.avatar}
