@@ -73,11 +73,47 @@ export interface GradeResult {
 }
 
 /**
+ * 공백을 진짜 글자와 맞바꾸는 값.
+ *
+ * **공백은 글자와 맞바꿀 수 있는 것이 아닙니다.** 띄어쓰기를 틀린 것과
+ * 글자를 틀린 것은 아이에게 완전히 다른 이야기라, 한 자리에서 뭉뜽그리면 안 됩니다.
+ *
+ * 3인 것에는 까닭이 있습니다. 지움+넣음으로 돌아가는 값은 **언제나 2 이하**입니다 —
+ * `dp[i-1][j] ≤ dp[i-1][j-1] + 1` 이 늘 성립하므로(한 글자 넣으면 닿는 자리니까)
+ * `dp[i-1][j] + 1 ≤ dp[i-1][j-1] + 2` 입니다.
+ * 그래서 3을 매기면 이 맞바꿈은 **뽑힐 수가 없습니다.** 금지한 것과 같습니다.
+ * (2로 두면 지움+넣음과 동점이 되는데, 역추적이 맞바꿈을 먼저 보므로 그게 뽑힙니다.)
+ */
+const SPACE_SWAP_COST = 3;
+
+/**
+ * 두 글자를 맞바꾸는 값. **DP를 채울 때와 역추적할 때 같은 자를 써야 합니다.**
+ * 둘이 어긋나면 계산한 길과 되짚는 길이 달라져 엉뚱한 정렬이 나옵니다.
+ */
+function subCost(answerCh: string, inputCh: string): number {
+  if (answerCh === inputCh) return 0;
+  // 한쪽만 공백이면 맞바꿈이 아니라 「띄어쓰기를 빠뜨렸다/더 넣었다」입니다.
+  if ((answerCh === ' ') !== (inputCh === ' ')) return SPACE_SWAP_COST;
+  return 1;
+}
+
+/**
  * 두 문자열을 글자 단위로 정렬합니다.
  *
  * 표준 Levenshtein DP를 계산한 뒤 역추적합니다.
  * 역추적 시 대체(sub)를 우선 고려해서, 같은 자리의 글자끼리 짝지어지도록 합니다.
  * (그래야 "받침만 다름"을 감지할 수 있습니다. del+ins로 쪼개지면 감지 불가.)
+ *
+ * **공백만은 예외입니다**(`subCost`). 공백을 글자와 맞바꿀 수 있게 두면
+ * 값이 같은 길이 둘 생기고, 대체를 우선하는 역추적이 엉뚱한 쪽을 고릅니다.
+ *
+ *   정답 「작은 발자국」  입력 「자근발자국」
+ *     맞는 길   작→자(1)  은→근(1)  공백 지움(1)      = 3
+ *     엉뚱한 길 작 지움(1) 은→자(1)  공백→근 맞바꿈(1) = 3   ← 동점이라 이쪽이 뽑혔음
+ *
+ * 그러면 「자」가 「은」 밑에 놓여 위아래 견주기가 무너지고(절대 원칙 6),
+ * ∨(띄어요) 표식이 사라져 **아이가 띄어쓰기를 틀렸다는 것조차 모릅니다.**
+ * 게다가 오류 유형이 `letter`로 적혀 오답노트·리포트·짝 문제까지 잘못 겨눕니다.
  */
 export function align(answer: string, input: string): AlignOp[] {
   const a = Array.from(answer);
@@ -93,7 +129,7 @@ export function align(answer: string, input: string): AlignOp[] {
 
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const cost = subCost(a[i - 1], b[j - 1]);
       dp[i][j] = Math.min(
         dp[i - 1][j - 1] + cost,
         dp[i - 1][j] + 1,
@@ -107,7 +143,8 @@ export function align(answer: string, input: string): AlignOp[] {
   let j = m;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      // DP를 채울 때와 **같은 자**를 씁니다. 어긋나면 되짚는 길이 달라집니다.
+      const cost = subCost(a[i - 1], b[j - 1]);
       if (dp[i][j] === dp[i - 1][j - 1] + cost) {
         ops.push(
           cost === 0
