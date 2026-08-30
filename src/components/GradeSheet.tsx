@@ -190,24 +190,143 @@ function AnswerPaper({ answer }: { answer: string }) {
   );
 }
 
-/*
-  여기에 채점표가 한 벌 더 있었습니다 — 낱낱의 칸을 띄엄띄엄 늘어놓던 옛 방식.
-  원고지 채점표를 만든 뒤로 「그냥 쓰기」에서만 쓰였는데, 두 벌을 함께 고쳐야 했습니다.
+/* ------------------------------------------------------------------ */
+/* 그냥 쓰기 채점표                                                     */
+/*                                                                     */
+/* **세로 짝은 그대로, 격자만 벗깁니다.**                                */
+/*                                                                     */
+/* 한때 원고지 채점표로 하나로 합쳤던 적이 있습니다. 합친 까닭은          */
+/* 「몇째 칸에서 틀렸는지 세려면 칸이 이어져 있어야 한다」였는데,          */
+/* 그건 **원고지에 쓴 아이 얘기**였습니다. 그냥 쓰기로 쓴 아이에게는       */
+/* 셀 칸이 애초에 없어서, 없는 격자를 채점에서 처음 만나게 됩니다.        */
+/*                                                                     */
+/* 대신 못 버리는 것이 있습니다 — 「내가 쓴 것」과 「정답」을 **같은        */
+/* 세로줄**에 놓는 것(절대 원칙 6). 두 줄을 따로 흘려 쓰면 글자를          */
+/* 빠뜨렸을 때 길이가 달라져 어긋납니다. 그래서 짝은 그대로 두고           */
+/* 격자·남은 종이만 걷어냅니다.                                          */
+/*                                                                     */
+/* 두 벌이 되지만 **데이터는 한 벌**입니다. 여기는 `result.columns`을     */
+/* 그대로 쓰고, 원고지 쪽만 `toGradeCells`로 칸에 앉힙니다.              */
+/* 예전에 짐이 됐던 것은 열을 칸으로 옮기는 셈이 두 벌이었기 때문입니다.   */
+/*                                                                     */
+/* 덤으로 쉼표 자리가 바로잡힙니다 — 「쉼표 뒤는 칸을 안 비운다」는        */
+/* 원고지 규칙이라, 그냥 쓰기 채점표는 그 규칙을 아예 거치지 않습니다.     */
+/* ------------------------------------------------------------------ */
 
-  하나로 합쳤습니다. 원고지 채점표가 「그냥 쓰기」에도 더 낫습니다 —
-  격자는 아이가 쓴 방식이 아니라 **견주는 방식**이기 때문입니다.
-  칸이 이어져 있어야 몇째 글자에서 틀렸는지 셀 수 있고,
-  띄어쓰기가 표식이 아니라 빈 칸으로 드러납니다.
-*/
+/** 한 열 = 위(내가 쓴 것) / 아래(정답) 한 짝. 칸 테두리 없이 글자만 세웁니다. */
+function PlainColumn({ column }: { column: Column }) {
+  switch (column.kind) {
+    case 'same':
+      return (
+        <span className="gl-col">
+          <span className="gl-mine">{column.input}</span>
+          <span className="gl-ans">{column.answer}</span>
+        </span>
+      );
+
+    case 'diff':
+      return (
+        <span className="gl-col gl-col--bad">
+          <span className="gl-mine gl-mine--wrong">{column.input}</span>
+          <span className="gl-ans gl-ans--fix">{column.answer}</span>
+        </span>
+      );
+
+    case 'missing':
+      return (
+        <span className="gl-col gl-col--bad">
+          <span className="gl-mine gl-mine--void" aria-label="쓰지 않음">
+            ·
+          </span>
+          <span className="gl-ans gl-ans--fix">{column.answer}</span>
+        </span>
+      );
+
+    case 'extra':
+      return (
+        <span className="gl-col gl-col--bad">
+          <span className="gl-mine gl-mine--wrong">{column.input}</span>
+          <span className="gl-ans gl-ans--void" aria-label="정답에 없음">
+            ·
+          </span>
+        </span>
+      );
+
+    /*
+      띄어쓰기는 글자가 없는 오류라 표식으로 짚습니다.
+      원고지에서는 빈 칸 자체가 드러내 주지만, 격자가 없으면 보이지 않습니다.
+    */
+    case 'needSpace':
+      return (
+        <span className="gl-col gl-col--bad">
+          {/* 표식도 글자와 **같은 상자**에 담습니다 — 안 그러면 윗줄이 줄로 안 읽힙니다 */}
+          <span className="gl-mine gl-mine--mark">
+            <PenMark kind="vee" />
+          </span>
+          <span className="gl-ans gl-ans--space" />
+        </span>
+      );
+
+    case 'extraSpace':
+      return (
+        <span className="gl-col gl-col--bad">
+          <span className="gl-mine gl-mine--mark">
+            <PenMark kind="cross" />
+          </span>
+          <span className="gl-ans gl-ans--void">·</span>
+        </span>
+      );
+  }
+}
+
+/**
+ * 그냥 쓰기로 쓴 답의 채점표.
+ *
+ * 문장이 끝나는 데서 끝납니다 — 남은 종이를 채우지 않습니다.
+ * 줄은 글처럼 자연스럽게 넘어갑니다.
+ */
+function GradeLine({ result }: { result: GradeResult }) {
+  return (
+    <div className="gl-wrap">
+      {/* 칸을 하나하나 읽어 주면 오히려 알아듣기 어렵습니다. 문장 두 줄로 대신합니다. */}
+      <p className="sr-only">
+        내가 쓴 것: {result.input}. 정답: {result.answer}.
+      </p>
+      <div className="gl" aria-hidden="true">
+        {result.columns.map((c, i) => (
+          <PlainColumn key={i} column={c} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 맞았을 때 — 그냥 쓰기에서는 문장 그대로 보여 줍니다 */
+function AnswerLine({ answer }: { answer: string }) {
+  return (
+    <p className="gl-correct">
+      {answer}
+    </p>
+  );
+}
 
 export function GradeSheet({
   result,
   note,
+  writeMode = 'wongoji',
 }: {
   result: GradeResult;
   /** 별 획득 안내 등 상황별 한 줄 안내 */
   note?: string | null;
+  /**
+   * 아이가 어떻게 썼나. **쓴 방식대로 견주어 줍니다.**
+   *
+   * 원고지에 썼으면 칸으로, 그냥 썼으면 글로.
+   * 없는 격자를 채점에서 처음 만나면 무엇을 보라는 건지 한 박자 늦게 알아듣습니다.
+   */
+  writeMode?: 'wongoji' | 'plain';
 }) {
+  const 그냥쓰기 = writeMode === 'plain';
   if (result.correct) {
     return (
       <div
@@ -220,7 +339,7 @@ export function GradeSheet({
         >
           맞았어요
         </div>
-        <AnswerPaper answer={result.answer} />
+        {그냥쓰기 ? <AnswerLine answer={result.answer} /> : <AnswerPaper answer={result.answer} />}
         {note && (
           <p
             className="mt-4 rounded-sm px-3 py-2.5 text-center text-sm"
@@ -250,7 +369,7 @@ export function GradeSheet({
         <span style={{ color: 'var(--grid)' }}>아랫줄 · 정답</span>
       </div>
 
-      <GradePaper result={result} />
+      {그냥쓰기 ? <GradeLine result={result} /> : <GradePaper result={result} />}
 
       <div className="mt-5 flex flex-col gap-2">
         {result.errorTypes.map((t) => (

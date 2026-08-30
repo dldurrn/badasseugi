@@ -304,7 +304,7 @@ export function InlineNotePractice({
             )}
           </div>
         ) : (
-          result && <GradeSheet result={result} />
+          result && <GradeSheet result={result} writeMode={writeMode} />
         )}
 
         {note && (

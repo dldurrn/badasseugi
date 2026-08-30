@@ -459,7 +459,7 @@ export function DictationSession({
       {/* 채점 결과 */}
       {phase === 'reviewing' && result && (
         <>
-          <GradeSheet result={result} note={starNote} />
+          <GradeSheet result={result} note={starNote} writeMode={writeMode} />
           {/* 틀렸으면 정답을 볼 틈을 줍니다 — 습관처럼 누르다 지나치지 않게 */}
           <NextButton hold={!result.correct} onClick={next}>
             {isLast ? '결과 보기' : '다음 문제'}
