@@ -46,7 +46,12 @@ export function NoteDeleteButton({ id, content }: { id: string; content: string 
       {error ? (
         <span style={{ color: 'var(--pen-deep)' }}>{error}</span>
       ) : (
-        <span style={{ color: 'var(--ink-soft)' }}>별도 사라져요</span>
+        /*
+          「지웠으니 없어졌겠지」와 실제가 어긋나면 안 됩니다.
+          노트는 「할 일」이고 리포트 기록은 「일어난 일」이라 서로 다릅니다 —
+          목록을 정리했다고 과거가 사라지면 리포트가 정리 습관에 따라 달라집니다.
+        */
+        <span style={{ color: 'var(--ink-soft)' }}>별은 사라지고, 리포트 기록은 남아요</span>
       )}
       <button onClick={() => setAsking(false)} className="px-1" style={{ color: 'var(--ink-soft)' }}>
         취소

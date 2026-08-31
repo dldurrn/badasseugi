@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { badRequest, readJson, requireUser } from '@/lib/api';
 import { fillTwins } from '@/lib/twin-server';
+import { buildWrongEvents } from '@/lib/wrong-events';
 import { isBuiltinSetId } from '@/data/dictation-bank';
 import { scoreOf } from '@/lib/grading';
 import {
@@ -89,8 +90,17 @@ export async function POST(request: Request) {
   const logAttempt =
     body.logAttempt !== false || clean.length > 1 || mode === 'exam';
 
+  /*
+    방금 만든 풀이 기록의 id.
+
+    오답 이력이 이걸 가리켜야 「최근 기록을 눌러 그날 무엇을 틀렸는지」가 됩니다.
+    그리고 attempts 를 타고 가면 builtin_set_id 가 있어 **단계별**로도 셀 수 있습니다.
+    복습(logAttempt=false)은 기록 자체가 없으므로 null 로 남습니다.
+  */
+  let attemptId: string | null = null;
+
   if (logAttempt) {
-    const { error: attemptError } = await supabase.from('attempts').insert({
+    const { data: attemptRow, error: attemptError } = await supabase.from('attempts').insert({
       child_id: childId,
       module,
       mode,
@@ -108,7 +118,11 @@ export async function POST(request: Request) {
       score,
       correct_count: correctCount,
       total_count: clean.length,
-    });
+    })
+      .select('id')
+      .single();
+
+    attemptId = (attemptRow?.id as string | undefined) ?? null;
 
     if (attemptError) {
       console.error('[sessions] 기록 저장 실패', attemptError);
@@ -184,6 +198,19 @@ export async function POST(request: Request) {
     void fillTwins(supabase, childId, applied.notes).catch((e) =>
       console.error('[sessions] 짝 만들기 실패', e),
     );
+  }
+
+  /* 2-1) 오답 이력 — 틀린 사건을 한 줄씩 --------------------------------
+     오답노트는 문제마다 한 줄이라 계속 덮어써집니다. 「지금 상태」는 알아도
+     「일어난 일」이 안 남아, 리포트가 **나아짐을 영영 못 보여 줍니다.**
+     여기 쌓인 줄은 안 바뀌고 안 지워집니다.
+
+     중도 이탈하면 이 라우트에 아예 안 오므로 여기도 안 남습니다(절대 원칙 2).
+     실패해도 세션 저장은 이미 끝난 뒤라 아이 화면에는 아무 일도 없습니다.        */
+  const events = buildWrongEvents({ childId, attemptId, module, mode, outcomes: clean });
+  if (events.length > 0) {
+    const { error: eventError } = await supabase.from('wrong_events').insert(events);
+    if (eventError) console.error('[sessions] 오답 이력 저장 실패', eventError);
   }
 
   /* 3) 보상 — 시험 모드를 끝까지 마쳤을 때만 --------------------------- */
