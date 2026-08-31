@@ -100,8 +100,13 @@ export default async function ReportPage({
     <main className="page">
       <header className="mb-4 pt-4">
         <h1 className="display text-2xl font-bold">리포트</h1>
+        {/*
+          예전에는 여기 「최근 4주 기록이에요」라고 적혀 있었습니다.
+          그런데 오답 유형은 전체 기간이라 사실이 아니었습니다.
+          범위는 구역마다 달라서, 머리말에서 단정하지 않고 각 구역이 스스로 밝힙니다.
+        */}
         <p className="mt-1 text-sm" style={{ color: 'var(--ink-soft)' }}>
-          최근 4주 기록이에요
+          {selected.nickname} 님의 기록이에요
         </p>
       </header>
 
@@ -130,11 +135,17 @@ export default async function ReportPage({
       )}
 
       <h2 className="section-title mb-2">이번 주</h2>
-      <div className="surface mb-6 grid grid-cols-3 divide-x" style={{ borderColor: 'var(--rule)' }}>
+      {/*
+        평균 점수를 여기서 뺐습니다. 아래 갈래 표의 「이번 주」 칸과 **완전히 같은 셈**이라
+        같은 숫자가 두 번 나오고 있었습니다. 그리고 뭉갠 평균은 견줄 수 없는 것을 견줍니다.
+      */}
+      <div className="surface mb-6 grid grid-cols-2 divide-x" style={{ borderColor: 'var(--rule)' }}>
         {[
-          { label: '연습한 날', value: report.daysPracticed === 0 ? '—' : `${report.daysPracticed}일` },
+          {
+            label: `이번 주 ${report.daysElapsed}일 중`,
+            value: report.daysPracticed === 0 ? '—' : `${report.daysPracticed}일`,
+          },
           { label: '푼 문제', value: report.problemsSolved === 0 ? '—' : `${report.problemsSolved}개` },
-          { label: '평균 점수', value: report.averageScore === null ? '—' : `${report.averageScore}점` },
         ].map((stat) => (
           <div key={stat.label} className="px-2 py-4 text-center">
             <div className="display text-xl font-bold">{stat.value}</div>
@@ -145,22 +156,72 @@ export default async function ReportPage({
         ))}
       </div>
 
-      <h2 className="section-title mb-2">주마다 평균</h2>
-      <ul className="surface mb-6 flex flex-col gap-3 p-4">
-        {report.weeklyAverages.map((week) => (
-          <li key={week.label} className="flex items-center gap-3 text-sm">
-            <span className="w-14 shrink-0" style={{ color: 'var(--ink-soft)' }}>
-              {week.label}
-            </span>
-            <Bar value={week.average ?? 0} total={100} />
-            <span className="w-12 text-right text-xs tabular-nums" style={{ color: 'var(--ink-faint)' }}>
-              {week.average === null ? '기록 없음' : `${week.average}점`}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {/*
+        갈래(과목 × 방식)로 나눠 보여 줍니다.
 
-      <h2 className="section-title mb-2">받아쓰기 — 어디서 자주 틀릴까요</h2>
+        예전에는 전부 한 평균이었습니다. 그러면 받아쓰기 20단계 시험과
+        맞춤법 1단계 연습이 같은 숫자에 들어가서, 「지난주 75 → 이번 주 82」가
+        **실력이 는 것인지 쉬운 걸 고른 것인지 구분할 수 없었습니다.**
+        한 줄 안에서는 견줄 만한 것끼리만 견줍니다.
+      */}
+      <h2 className="section-title mb-2">주마다 점수</h2>
+      {report.tracks.length === 0 ? (
+        <p className="surface mb-6 p-5 text-center text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+          아직 기록이 없어요.
+          <br />
+          아이가 한 세트를 끝까지 마치면 여기에 쌓여요.
+        </p>
+      ) : (
+        <div className="surface mb-2 overflow-x-auto">
+          <table className="report-weeks">
+            <thead>
+              <tr>
+                <th scope="col" className="report-weeks__name"></th>
+                {report.tracks[0].weeks.map((w) => (
+                  <th key={w.label} scope="col">
+                    {w.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {report.tracks.map((track) => (
+                <tr key={track.key}>
+                  <th scope="row" className="report-weeks__name">
+                    {track.label}
+                  </th>
+                  {track.weeks.map((w) => (
+                    <td key={w.label}>
+                      {/*
+                        기록이 없는 주는 0점이 아니라 「—」입니다.
+                        안 한 것과 못 한 것은 부모에게 완전히 다른 이야기입니다.
+                      */}
+                      {w.average === null ? (
+                        <span className="report-weeks__none">—</span>
+                      ) : (
+                        <>
+                          <b>{w.average}</b>
+                          <span className="report-weeks__n">{w.count}회</span>
+                        </>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+        최근 4주 · 세션 점수의 평균이에요. 단계 난이도는 아직 가리지 않아요.
+      </p>
+
+      {/*
+        이 막대는 「몇 번 틀렸나」가 아니라 **그 유형이 든 오답노트가 몇 개인가**입니다.
+        같은 문장을 열 번 틀려도 1이고, 졸업한 노트도 그대로 셉니다.
+        셈을 바꾸려면 오답 이력을 따로 쌓아야 하므로, 지금은 **뜻을 바로 적습니다.**
+      */}
+      <h2 className="section-title mb-2">받아쓰기 — 어떤 오답이 남아 있나요</h2>
       {dictationTotal === 0 ? (
         <p className="surface mb-6 p-5 text-center text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
           아직 분석할 기록이 모이지 않았어요.
@@ -182,8 +243,12 @@ export default async function ReportPage({
           ))}
         </ul>
       )}
+      <p className="-mt-4 mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+        오답노트에 <b>남아 있는 문제 수</b>예요. 같은 문제를 여러 번 틀려도 하나로 세고,
+        졸업한 것도 들어 있어요.
+      </p>
 
-      <h2 className="section-title mb-2">맞춤법 — 헷갈리는 말</h2>
+      <h2 className="section-title mb-2">맞춤법 — 어떤 오답이 남아 있나요</h2>
       {spellingTotal === 0 ? (
         <p className="surface mb-6 p-5 text-center text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
           아직 분석할 기록이 모이지 않았어요.
@@ -205,6 +270,10 @@ export default async function ReportPage({
           ))}
         </ul>
       )}
+      <p className="-mt-4 mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+        오답노트에 <b>남아 있는 문제 수</b>예요. 같은 문제를 여러 번 틀려도 하나로 세고,
+        졸업한 것도 들어 있어요.
+      </p>
 
       <h2 className="section-title mb-2">오답노트</h2>
       <div className="surface mb-6 flex items-center gap-4 p-4 text-sm">

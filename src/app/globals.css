@@ -925,3 +925,65 @@
     padding: 14px 12px;
   }
 }
+
+@layer components {
+  /* ---------- 리포트 · 갈래별 주간 점수 ---------- */
+
+  /*
+    한 줄이 한 갈래(과목 × 방식)입니다.
+    예전에는 전부 한 평균이라 받아쓰기 시험과 맞춤법 연습이 같은 숫자에 들어갔습니다.
+    **한 줄 안에서만 견줍니다** — 줄을 가로질러 견주면 안 되는 것이라
+    막대가 아니라 숫자로 둡니다. 막대는 서로 견주라는 뜻이 되니까요.
+  */
+  .report-weeks {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 330px;
+  }
+  .report-weeks th,
+  .report-weeks td {
+    padding: 9px 6px;
+    text-align: center;
+    border-bottom: 1px solid var(--rule);
+  }
+  .report-weeks thead th {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .report-weeks tbody tr:last-child th,
+  .report-weeks tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  /* 갈래 이름은 왼쪽에 고정폭으로 — 눈이 줄을 따라가야 합니다 */
+  .report-weeks__name {
+    text-align: left;
+    padding-left: 14px;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--ink-soft);
+  }
+
+  .report-weeks td b {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  /* 몇 번 풀어서 나온 평균인지 — 한 번짜리 평균과 다섯 번짜리는 무게가 다릅니다 */
+  .report-weeks__n {
+    display: block;
+    margin-top: 1px;
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+  }
+  /* 기록이 없는 주. 0점이 아니라 「안 했음」입니다 */
+  .report-weeks__none {
+    color: var(--ink-faint);
+  }
+}

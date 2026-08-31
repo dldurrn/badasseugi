@@ -1,6 +1,7 @@
 import { findBuiltinSet, isBuiltinSetId } from '@/data/dictation-bank';
 import { createClient } from '@/lib/supabase/server';
 import { seoulWeekStart, toDateKeyInSeoul, type WrongNote } from '@/lib/review';
+import { buildTracks, daysIntoWeek, type Track } from '@/lib/report';
 import type { Mode, Module } from '@/lib/types';
 
 /**
@@ -257,12 +258,24 @@ export interface AttemptRow {
 }
 
 export interface ReportData {
-  /** 최근 7일 */
+  /** 이번 달력 주(월~일)에 한 번이라도 푼 날 수 */
   daysPracticed: number;
+  /**
+   * 이번 주가 며칠째인가(1~7).
+   *
+   * 「3일」만 보여 주면 수요일의 3일과 일요일의 3일이 같아 보입니다 —
+   * 앞의 것은 하루도 안 빠진 것이고 뒤의 것은 나흘을 쉰 것인데요.
+   */
+  daysElapsed: number;
   problemsSolved: number;
-  averageScore: number | null;
-  /** 최근 28일 주차별 평균 (오래된 주 → 최근 주) */
-  weeklyAverages: Array<{ label: string; average: number | null; count: number }>;
+  /**
+   * 갈래(과목 × 방식)별 최근 4주 평균.
+   *
+   * 하나의 평균으로 뭉개면 **견줄 수 없는 것을 견주게 됩니다** —
+   * 받아쓰기 20단계 시험과 맞춤법 1단계 연습이 같은 숫자에 들어갔습니다.
+   * 기록이 있는 갈래만 옵니다.
+   */
+  tracks: Track[];
   recent: AttemptRow[];
   /** 받아쓰기 오답의 오류 유형 분포 */
   dictationWeakness: Array<[string, number]>;
@@ -310,23 +323,26 @@ export async function getReport(childId: string): Promise<ReportData> {
 
   const days = new Set(thisWeek.map((a) => toDateKeyInSeoul(new Date(a.createdAt))));
   const problemsSolved = thisWeek.reduce((sum, a) => sum + a.totalCount, 0);
-  const averageScore =
-    thisWeek.length === 0
-      ? null
-      : Math.round(thisWeek.reduce((sum, a) => sum + a.score, 0) / thisWeek.length);
 
-  const weeklyAverages = [3, 2, 1, 0].map((weeksAgo) => {
-    const monday = seoulWeekStart(new Date(Date.now() - weeksAgo * 7 * DAY));
-    const bucket = byWeek.get(monday) ?? [];
-    return {
-      label: weeksAgo === 0 ? '이번 주' : weeksAgo === 1 ? '지난주' : `${weeksAgo}주 전`,
-      average:
-        bucket.length === 0
-          ? null
-          : Math.round(bucket.reduce((sum, a) => sum + a.score, 0) / bucket.length),
-      count: bucket.length,
-    };
-  });
+  /*
+    갈래별로 나눠 셉니다. 예전에는 여기서 전부 한 평균을 냈는데,
+    그러면 과목도 방식도 난이도도 안 가린 숫자가 리포트에서 가장 크게 떴습니다.
+    셈은 report.ts 가 합니다 — 화면도 DB도 모르는 순수 함수라 테스트로 지킵니다.
+  */
+  const weekStarts = [3, 2, 1, 0].map((weeksAgo) =>
+    seoulWeekStart(new Date(Date.now() - weeksAgo * 7 * DAY)),
+  );
+  const weekLabels = ['3주 전', '2주 전', '지난주', '이번 주'];
+  const tracks = buildTracks(
+    attempts.map((a) => ({
+      module: a.module,
+      mode: a.mode,
+      score: a.score,
+      weekStart: seoulWeekStart(new Date(a.createdAt)),
+    })),
+    weekStarts,
+    weekLabels,
+  );
 
   const notes = await listWrongNotes(childId);
   const countBy = (module: Module) => {
@@ -342,9 +358,9 @@ export async function getReport(childId: string): Promise<ReportData> {
 
   return {
     daysPracticed: days.size,
+    daysElapsed: daysIntoWeek(toDateKeyInSeoul(), currentWeek),
     problemsSolved,
-    averageScore,
-    weeklyAverages,
+    tracks,
     recent: attempts.slice(0, 8),
     dictationWeakness: countBy('dictation'),
     spellingWeakness: countBy('spelling'),
