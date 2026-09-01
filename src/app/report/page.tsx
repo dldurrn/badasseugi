@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { ERROR_LABEL, type ErrorType } from '@/lib/grading';
 import { getReport } from '@/lib/data';
 import { listChildren, readActiveProfile } from '@/lib/profile-server';
+import { formatSeoulDate } from '@/lib/review';
 
 export const metadata = { title: '리포트 · 받아쓰기 공책' };
 
@@ -306,10 +307,7 @@ export default async function ReportPage({
               </span>
               <span className="w-12 text-right font-bold tabular-nums">{attempt.score}점</span>
               <span className="w-12 text-right text-[11px]" style={{ color: 'var(--ink-faint)' }}>
-                {new Date(attempt.createdAt).toLocaleDateString('ko-KR', {
-                  month: 'numeric',
-                  day: 'numeric',
-                })}
+                {formatSeoulDate(attempt.createdAt, { month: 'numeric', day: 'numeric' })}
               </span>
             </li>
           ))}

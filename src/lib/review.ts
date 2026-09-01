@@ -117,6 +117,23 @@ export function seoulWeekStart(d: Date = new Date()): string {
   return base.toISOString().slice(0, 10);
 }
 
+/**
+ * 화면에 보여 줄 날짜 — **언제나 한국 기준**입니다.
+ *
+ * `toLocaleDateString` 은 시간대를 안 주면 **그 코드가 도는 곳**의 시간대를 씁니다.
+ * 트로피·최근 기록을 그리는 것은 서버 컴포넌트이고 Vercel 은 UTC 로 돕니다.
+ * 그래서 한국 시간 자정~아침 9시에 받은 메달이 **전날로 찍혔습니다** —
+ * 9월 1일 아침 8시에 받은 메달이 「8월 31일」로 나왔습니다.
+ *
+ * 시간대를 못 박아 두면 어디서 부르든 같은 날짜가 나옵니다.
+ */
+export function formatSeoulDate(
+  iso: string,
+  opts: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' },
+): string {
+  return new Date(iso).toLocaleDateString('ko-KR', { ...opts, timeZone: 'Asia/Seoul' });
+}
+
 /** 별 2개를 다 모았으면 졸업. */
 export function isGraduated(note: Pick<WrongNote, 'streak'>): boolean {
   return note.streak >= STARS_TO_GRADUATE;
@@ -131,11 +148,15 @@ export function isGraduated(note: Pick<WrongNote, 'streak'>): boolean {
  * @param notes  현재 오답노트 (변경하지 않고 새 배열을 반환)
  * @param outcomes 이번 세션에서 푼 문제들의 결과
  * @param today  오늘 날짜 키. 테스트에서 주입할 수 있도록 인자로 받습니다.
+ *               **기본값이 한국 기준**입니다 — 예전에는 `toDateKey()`(도는 자리의 시간대)였는데,
+ *               부르는 쪽이 안 넘기면 Vercel(UTC)에서 하루가 아침 9시에 바뀝니다.
+ *               지금은 `/api/sessions` 가 늘 넘겨 줘서 드러난 적은 없지만,
+ *               기본값이 틀린 채로 두면 다음에 부르는 사람이 밟습니다.
  */
 export function applySessionOutcomes(
   notes: WrongNote[],
   outcomes: ItemOutcome[],
-  today: string = toDateKey(),
+  today: string = toDateKeyInSeoul(),
 ): ApplyResult {
   // 1) 같은 문제 중복 제거 — 하나라도 틀렸으면 틀림으로 병합
   const merged = new Map<string, ItemOutcome>();

@@ -87,3 +87,17 @@ describe('seoulWeekStart', () => {
     expect(seoulWeekStart(new Date('2026-08-16T23:30:00Z'))).toBe('2026-08-17');
   });
 });
+
+describe('세트 이름 제안 — 한국 날짜로', () => {
+  it('서버가 UTC 로 돌아도 한국 날짜를 씁니다', () => {
+    /*
+      이걸 부르는 것은 서버 컴포넌트(/dictation/new)이고 Vercel 은 UTC 로 돕니다.
+      그래서 9월 1일 아침 8시에 세트를 만들면 「8월 31일 받아쓰기」가 제안됐습니다.
+      메달 날짜가 하루 어긋나던 것과 **같은 함정**입니다.
+    */
+    // 2026-09-01 08:10 KST == 2026-08-31 23:10 UTC
+    expect(suggestSetName(new Date('2026-08-31T23:10:00Z'))).toBe('9월 1일 받아쓰기');
+    // 2026-08-31 23:30 KST
+    expect(suggestSetName(new Date('2026-08-31T14:30:00Z'))).toBe('8월 31일 받아쓰기');
+  });
+});

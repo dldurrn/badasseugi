@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { badRequest, readJson, requireUser } from '@/lib/api';
 import { readEnginePref } from '@/lib/settings-server';
+import { toDateKeyInSeoul } from '@/lib/review';
 import {
   looksBlocked,
   matchVoice,
@@ -81,7 +82,12 @@ export async function POST(request: Request) {
   const gapMs = Math.min(2000, Math.max(0, rawGap));
 
   /* 하루 사용량 확인 — 과금 단위가 글자 수라 글자 수로 셉니다 -------------- */
-  const today = new Date().toISOString().slice(0, 10);
+  /*
+    **한국 날짜**로 셉니다. toISOString() 은 UTC 라 하루가 아침 9시에 바뀝니다 —
+    아이가 아침에 받아쓰기를 하면 어제 몫을 이어 쓰고,
+    밤 9시가 넘으면 하루치가 새로 열립니다. 타입캐스트는 하루 500자라 실제로 문제가 됩니다.
+  */
+  const today = toDateKeyInSeoul();
 
   const { data: usage } = await supabase
     .from('tts_usage')

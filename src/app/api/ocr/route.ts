@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api';
 import { limitsFor, planOf } from '@/lib/plan';
+import { toDateKeyInSeoul } from '@/lib/review';
 
 /**
  * 문제지 사진에서 받아쓰기 문장을 추출합니다.
@@ -141,7 +142,8 @@ export async function POST(request: Request) {
 
   // 일일 사용량 확인
   const limit = Number(process.env.OCR_DAILY_LIMIT ?? 30);
-  const today = new Date().toISOString().slice(0, 10);
+  // 한국 날짜로 셉니다. UTC 로 두면 하루가 아침 9시에 바뀝니다.
+  const today = toDateKeyInSeoul();
   const { data: usage } = await supabase
     .from('ocr_usage')
     .select('count')

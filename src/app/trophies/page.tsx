@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { EmptyState } from '@/components/EmptyState';
 import { listTrophies } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
+import { formatSeoulDate } from '@/lib/review';
 
 export const metadata = { title: '보관함 · 받아쓰기 공책' };
 
@@ -77,10 +78,7 @@ export default async function TrophiesPage() {
                 </span>
               )}
               <span className="text-[11px]" style={{ color: 'var(--ink-faint)' }}>
-                {new Date(trophy.createdAt).toLocaleDateString('ko-KR', {
-                  month: 'long',
-                  day: 'numeric',
-                })}
+                {formatSeoulDate(trophy.createdAt)}
               </span>
             </li>
           ))}

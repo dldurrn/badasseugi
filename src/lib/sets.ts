@@ -1,4 +1,5 @@
 import { normalize } from '@/lib/hangul';
+import { toDateKeyInSeoul } from './review';
 
 /**
  * 받아쓰기 세트 입력값 다듬기.
@@ -33,7 +34,14 @@ export function normalizeSentences(raw: unknown): string[] {
   return out;
 }
 
-/** 오늘 날짜로 기본 세트 이름을 제안합니다. 이름 짓는 수고를 덜어 줍니다. */
+/**
+ * 오늘 날짜로 기본 세트 이름을 제안합니다. 이름 짓는 수고를 덜어 줍니다.
+ *
+ * **한국 날짜로 셉니다.** `getMonth()`·`getDate()` 는 도는 자리의 시간대를 쓰는데,
+ * 이걸 부르는 것은 **서버 컴포넌트**(`/dictation/new`)이고 Vercel 은 UTC 로 돕니다.
+ * 그래서 9월 1일 아침에 세트를 만들면 「8월 31일 받아쓰기」가 제안됐습니다.
+ */
 export function suggestSetName(d: Date = new Date()): string {
-  return `${d.getMonth() + 1}월 ${d.getDate()}일 받아쓰기`;
+  const [, m, day] = toDateKeyInSeoul(d).split('-');
+  return `${Number(m)}월 ${Number(day)}일 받아쓰기`;
 }

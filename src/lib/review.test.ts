@@ -8,6 +8,8 @@ import {
   toDateKey,
   type WrongNote,
   type ItemOutcome,
+  formatSeoulDate,
+  toDateKeyInSeoul,
 } from './review';
 
 const wrong = (refId: string, errorTypes: string[] = ['batchim']): ItemOutcome => ({
@@ -304,5 +306,45 @@ describe('짝 문제 — 두 번째 걸음', () => {
     );
     expect(r.starsEarned).toBe(1);
     expect(r.notes[0].streak).toBe(1);
+  });
+});
+
+describe('화면 날짜 — 어디서 그리든 한국 기준', () => {
+  it('한국 자정~아침 9시에 받은 것이 전날로 찍히지 않는다', () => {
+    /*
+      실제로 났던 일입니다.
+
+      트로피·최근 기록을 그리는 것은 **서버 컴포넌트**이고 Vercel 은 UTC 로 돕니다.
+      시간대를 안 주면 toLocaleDateString 이 그 자리의 시간대를 쓰므로,
+      9월 1일 아침 8시(KST)에 받은 메달이 「8월 31일」로 나왔습니다.
+    */
+    // 2026-09-01 08:10 KST == 2026-08-31 23:10 UTC
+    expect(formatSeoulDate('2026-08-31T23:10:00Z')).toBe('9월 1일');
+    // 2026-08-31 23:30 KST == 2026-08-31 14:30 UTC
+    expect(formatSeoulDate('2026-08-31T14:30:00Z')).toBe('8월 31일');
+  });
+
+  it('자정 직전·직후가 갈린다', () => {
+    // 2026-08-31 23:59 KST
+    expect(formatSeoulDate('2026-08-31T14:59:00Z')).toBe('8월 31일');
+    // 2026-09-01 00:01 KST
+    expect(formatSeoulDate('2026-08-31T15:01:00Z')).toBe('9월 1일');
+  });
+
+  it('형식을 바꿔 줘도 시간대는 못 바꾼다', () => {
+    // 부르는 쪽이 timeZone 을 덮어쓸 수 없어야 합니다.
+    expect(formatSeoulDate('2026-08-31T23:10:00Z', { month: 'numeric', day: 'numeric' })).toBe(
+      '9. 1.',
+    );
+  });
+
+  it('하루 사용량 키도 한국 날짜다', () => {
+    /*
+      TTS·OCR 한도가 UTC 로 세어져서 하루가 **아침 9시에 바뀌었습니다.**
+      아이가 아침에 받아쓰기를 하면 어제 몫을 이어 쓰고,
+      밤 9시가 넘으면 하루치가 새로 열렸습니다.
+    */
+    expect(toDateKeyInSeoul(new Date('2026-08-31T23:10:00Z'))).toBe('2026-09-01');
+    expect(toDateKeyInSeoul(new Date('2026-08-31T14:30:00Z'))).toBe('2026-08-31');
   });
 });
