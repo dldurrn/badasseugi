@@ -70,6 +70,26 @@ export default async function SetPage({ params }: { params: Promise<{ id: string
       ) : (
         <>
           <div className="flex flex-col gap-2.5">
+            {/*
+              세 장을 **한 묶음**에 두고, 듣고 고르기를 **맨 위**에 둡니다.
+
+              처음에는 「채점하는 모드가 아니니 눈에 덜 띄게」라며 카드 밖에 옅은 한 줄로 두었는데,
+              그 자리가 카드 묶음과 안내 문구 사이라 **있는 줄도 모르고 지나갔습니다.**
+              눈에 덜 띄게 하려던 것이 안 보이게 만들었습니다.
+
+              맨 위인 것은 **가장 가볍게 시작할 수 있는 것이 맨 위**여야 하기 때문입니다.
+              문을 여는 자리에 시험이 있으면 오늘 할 마음이 있다가도 닫힙니다.
+              점수가 안 남는 쪽 → 남는 쪽 → 보상이 걸린 쪽 차례입니다.
+              「연습」이라는 말은 여전히 쓰지 않습니다 — mode=practice 는 채점을 하니까요.
+            */}
+            {hasChoice && (
+              <Link href={`/dictation/${set.id}/choose`} className="surface block p-4">
+                <span className="display block text-lg font-bold">듣고 고르기</span>
+                <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-soft)' }}>
+                  키보드 없이 손가락으로 골라요. 점수는 남지 않아요
+                </span>
+              </Link>
+            )}
             <Link href={`/dictation/${set.id}/play?mode=practice`} className="surface block p-4">
               <span className="display block text-lg font-bold">연습하기</span>
               <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-soft)' }}>
@@ -82,26 +102,6 @@ export default async function SetPage({ params }: { params: Promise<{ id: string
                 끝까지 마치고 90점을 넘기면 배지, 100점이면 카드를 받아요
               </span>
             </Link>
-
-            {/*
-              세 장을 **한 묶음**에 둡니다.
-
-              처음에는 「채점하는 모드가 아니니 눈에 덜 띄게」라며 카드 밖에 옅은 한 줄로 두었는데,
-              그 자리가 카드 묶음과 안내 문구 사이라 **있는 줄도 모르고 지나갔습니다.**
-              눈에 덜 띄게 하려던 것이 안 보이게 만들었습니다.
-
-              세 갈래가 나란히 있어야 「오늘은 뭘 할까」를 한자리에서 고를 수 있고,
-              이 모드가 필요한 때(등교길·시험 직전)는 오히려 급할 때입니다.
-              「연습」이라는 말은 여전히 쓰지 않습니다 — mode=practice 는 채점을 하니까요.
-            */}
-            {hasChoice && (
-              <Link href={`/dictation/${set.id}/choose`} className="surface block p-4">
-                <span className="display block text-lg font-bold">듣고 고르기</span>
-                <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-soft)' }}>
-                  키보드 없이 손가락으로 골라요. 점수는 남지 않아요
-                </span>
-              </Link>
-            )}
           </div>
 
           <p className="mt-5 text-center text-xs leading-relaxed" style={{ color: 'var(--ink-faint)' }}>
