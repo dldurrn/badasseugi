@@ -24,7 +24,7 @@ import { growingGrid } from '@/lib/wongoji';
 import { WongojiSheet } from './WongojiSheet';
 
 /**
- * 골라서 익히기 — 듣고, 문장을 처음부터 끝까지 골라 만듭니다.
+ * 듣고 고르기 — 듣고, 문장을 처음부터 끝까지 골라 만듭니다.
  *
  * **이 부품은 아무것도 저장하지 않습니다.** `saveSession` 도 `/api/sessions` 도 부르지 않습니다.
  * 점수·오답노트 별·이력 어느 것에도 닿지 않습니다 — 2지선다는 찍어서 절반이 맞는데,
@@ -147,9 +147,9 @@ export function ChoiceBoard({
     return (
       <div className="page page--write">
         <div className="surface mt-12 flex flex-col items-center gap-3 p-7 text-center">
-          <p className="display text-xl font-bold">다 익혔어요</p>
+          <p className="display text-xl font-bold">다 골랐어요</p>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-            {items.length}문장을 모두 골랐어요.
+            {items.length}문장을 끝까지 골랐어요.
             <br />
             점수는 남지 않아요. 진짜로 써 보고 싶으면 연습하기로 가요.
           </p>
@@ -186,7 +186,7 @@ export function ChoiceBoard({
             className="rounded px-2 py-1 text-[11px] font-bold"
             style={{ background: 'var(--paper-sunk)', color: 'var(--ink-soft)' }}
           >
-            익히기
+            고르기
           </span>
         </div>
 

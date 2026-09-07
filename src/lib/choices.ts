@@ -2,7 +2,7 @@ import { compose, decompose, normalize } from './hangul';
 import { absorbsFollowingSpace, EMPTY, toCells } from './wongoji';
 
 /**
- * 골라서 익히기 — 문장을 **처음부터 끝까지 하나씩 골라** 만들어 나갑니다.
+ * 듣고 고르기 — 문장을 **처음부터 끝까지 하나씩 골라** 만들어 나갑니다.
  *
  * 키보드가 없는 자리(등교길, 시험 직전)에서 쓰라고 만든 모드입니다.
  * 소리는 이미 폰에서 나니 **쓰는 쪽만 손가락으로 대신합니다.**

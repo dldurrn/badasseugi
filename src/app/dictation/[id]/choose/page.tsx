@@ -8,7 +8,7 @@ import { readActiveChild } from '@/lib/profile-server';
 import { readSettings } from '@/lib/settings-server';
 
 /**
- * 골라서 익히기.
+ * 듣고 고르기.
  *
  * **세션 라우트(`play`)와 일부러 갈라 두었습니다.**
  * `mode=` 값을 하나 더 만들면 `Mode` → `DictationRunner` → `saveSession` →

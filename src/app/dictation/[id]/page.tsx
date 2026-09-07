@@ -82,27 +82,27 @@ export default async function SetPage({ params }: { params: Promise<{ id: string
                 끝까지 마치고 90점을 넘기면 배지, 100점이면 카드를 받아요
               </span>
             </Link>
-          </div>
 
-          {/*
-            채점하는 모드가 아니라 카드로 두지 않습니다 — 시험보다 눈에 덜 띄어야 합니다.
-            키보드가 없는 자리(등교길·시험 직전)에서 손가락으로만 익히는 곳이라,
-            「연습」이라는 말도 쓰지 않습니다. mode=practice 는 채점을 하니까요.
-          */}
-          {hasChoice && (
-            <Link
-              href={`/dictation/${set.id}/choose`}
-              className="mt-3 flex items-center justify-between rounded px-1 py-2"
-            >
-              <span className="text-sm font-semibold" style={{ color: 'var(--ink-soft)' }}>
-                골라서 익히기
-                <span className="ml-1 font-normal" style={{ color: 'var(--ink-faint)' }}>
-                  · 키보드 없이 손가락으로 골라요. 점수는 남지 않아요
+            {/*
+              세 장을 **한 묶음**에 둡니다.
+
+              처음에는 「채점하는 모드가 아니니 눈에 덜 띄게」라며 카드 밖에 옅은 한 줄로 두었는데,
+              그 자리가 카드 묶음과 안내 문구 사이라 **있는 줄도 모르고 지나갔습니다.**
+              눈에 덜 띄게 하려던 것이 안 보이게 만들었습니다.
+
+              세 갈래가 나란히 있어야 「오늘은 뭘 할까」를 한자리에서 고를 수 있고,
+              이 모드가 필요한 때(등교길·시험 직전)는 오히려 급할 때입니다.
+              「연습」이라는 말은 여전히 쓰지 않습니다 — mode=practice 는 채점을 하니까요.
+            */}
+            {hasChoice && (
+              <Link href={`/dictation/${set.id}/choose`} className="surface block p-4">
+                <span className="display block text-lg font-bold">듣고 고르기</span>
+                <span className="mt-0.5 block text-xs" style={{ color: 'var(--ink-soft)' }}>
+                  키보드 없이 손가락으로 골라요. 점수는 남지 않아요
                 </span>
-              </span>
-              <span style={{ color: 'var(--ink-faint)' }}>›</span>
-            </Link>
-          )}
+              </Link>
+            )}
+          </div>
 
           <p className="mt-5 text-center text-xs leading-relaxed" style={{ color: 'var(--ink-faint)' }}>
             중간에 나가면 점수와 별이 남지 않아요.
