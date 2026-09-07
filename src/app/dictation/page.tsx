@@ -2,10 +2,21 @@ import Link from 'next/link';
 import { DictationSetCard } from '@/components/DictationSetCard';
 import { EmptyState } from '@/components/EmptyState';
 import { DICTATION_BANK } from '@/data/dictation-bank';
+import { hasChoices } from '@/lib/choices';
 import { builtinBestScores, listSets } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
 export const metadata = { title: '받아쓰기 · 받아쓰기 공책' };
+
+/**
+ * 내장 세트에 「듣고 고르기」로 풀 것이 있는가.
+ *
+ * 내장 문제는 안 바뀌므로 **한 번만 셈해 둡니다.** 화면을 열 때마다 200문장을
+ * 다시 훑을 까닭이 없습니다. (직접 넣은 문제는 `listSets` 가 함께 받아 옵니다.)
+ */
+const 내장고를것 = new Map(
+  DICTATION_BANK.map((set) => [set.id, set.sentences.some(hasChoices)] as const),
+);
 
 /**
  * 받아쓰기 — 세트 목록.
@@ -67,6 +78,7 @@ export default async function DictationPage() {
                 name={set.name}
                 detail={`문장 ${set.count}개${set.best !== null ? ` · 최고 ${set.best}점` : ''}`}
                 isChild={isChild}
+                hasChoice={set.hasChoice}
               />
             </li>
           ))}
@@ -96,6 +108,7 @@ export default async function DictationPage() {
                   best !== undefined ? ` · 최고 ${best}점` : ''
                 }`}
                 isChild={isChild}
+                hasChoice={내장고를것.get(set.id) ?? false}
               />
             </li>
           );

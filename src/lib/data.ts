@@ -1,4 +1,5 @@
 import { findBuiltinSet, isBuiltinSetId } from '@/data/dictation-bank';
+import { hasChoices } from '@/lib/choices';
 import { createClient } from '@/lib/supabase/server';
 import { seoulWeekStart, toDateKeyInSeoul, type WrongNote } from '@/lib/review';
 import { buildTracks, daysIntoWeek, type Track } from '@/lib/report';
@@ -23,14 +24,29 @@ export interface SetSummary {
   createdAt: string;
   /** 이 자녀의 최고 점수. 아직 안 풀었으면 null */
   best: number | null;
+  /**
+   * 「듣고 고르기」로 풀 것이 하나라도 있는가.
+   *
+   * 목록에서 버튼을 그릴지 정하는 데 씁니다. 눌러 봐야 「고를 것이 없어요」가
+   * 나오는 버튼을 만들지 않으려는 것이고, 세트 상세 화면과 같은 판정입니다.
+   */
+  hasChoice: boolean;
 }
 
 export async function listSets(childId: string | null): Promise<SetSummary[]> {
   const supabase = await createClient();
 
+  /*
+    문장을 함께 받아 옵니다.
+
+    예전에는 `set_items(count)` 로 개수만 셌는데, 목록에서 「듣고 고르기」 버튼을
+    그릴지 정하려면 문장이 있어야 합니다. 개수를 따로 세고 문장을 또 물으면
+    **도쿄를 두 번 왕복**하므로, 한 번에 받아 여기서 둘 다 셈합니다.
+    한 집의 문장은 다 합쳐야 몇 킬로바이트라 왕복 한 번보다 쌉니다.
+  */
   const { data: sets } = await supabase
     .from('sets')
-    .select('id, name, created_at, set_items(count)')
+    .select('id, name, created_at, set_items(sentence)')
     .order('created_at', { ascending: false });
 
   if (!sets) return [];
@@ -53,14 +69,15 @@ export async function listSets(childId: string | null): Promise<SetSummary[]> {
   }
 
   return sets.map((row) => {
-    // PostgREST의 집계는 [{ count: n }] 형태로 옵니다.
-    const nested = row.set_items as unknown as Array<{ count: number }> | null;
+    const items = (row.set_items as unknown as Array<{ sentence: string }> | null) ?? [];
+    const sentences = items.map((it) => it.sentence);
     return {
       id: row.id as string,
       name: row.name as string,
       createdAt: row.created_at as string,
-      count: nested?.[0]?.count ?? 0,
+      count: sentences.length,
       best: bestBySet.get(row.id as string) ?? null,
+      hasChoice: sentences.some(hasChoices),
     };
   });
 }
