@@ -518,6 +518,82 @@
     outline-offset: -2px;
   }
 
+  /* ---------- 골라서 익히기 ----------
+     키보드가 없는 자리(등교길)에서 쓰라고 만든 모드라, 후보를 **엄지가 닿는 곳**에 둡니다.
+     화면 아래에 붙여 두지 않으면 문장이 길어질수록 후보가 위로 밀려 올라갑니다.
+     탭바 위에 얹습니다 — 이 모드는 아무 때나 나가도 잃을 게 없어 탭바를 감추지 않습니다. */
+  .pick-bar {
+    position: sticky;
+    bottom: calc(68px + env(safe-area-inset-bottom));
+    z-index: 10;
+    display: flex;
+    gap: 10px;
+    background: var(--card);
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    padding: 10px;
+    box-shadow: 0 8px 20px rgba(35, 43, 51, 0.09);
+  }
+
+  .pick {
+    flex: 1 1 0;
+    min-width: 0;
+    /* 손가락으로만 누르는 화면이라 접근성 권고(44px)보다 넉넉히 둡니다. */
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 8px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius-sm);
+    background: var(--paper-sunk);
+    color: var(--ink);
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.25;
+    word-break: keep-all;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease,
+      transform 0.06s ease;
+  }
+  .pick:active {
+    transform: translateY(1px);
+  }
+  .pick:focus-visible {
+    outline: 2px solid var(--grid);
+    outline-offset: 2px;
+  }
+
+  /* 이음·끝 후보는 글자가 짧아 같은 크기로 두면 허전합니다. */
+  .pick--mark {
+    font-size: 16px;
+    color: var(--ink-soft);
+  }
+
+  /* 이미 정해진 앞부분 — 견줄 자리를 보여 줄 뿐 누르는 것과는 상관이 없습니다. */
+  .pick-head {
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+
+  /*
+    틀린 것을 **칸에 남기지 않습니다.**
+    잘못 고른 글자가 원고지에 들어갔다 나오면 그 글자를 본 시간이 길어집니다 —
+    틀린 표기를 눈에 익히는 것이 이 모드의 유일한 위험이라, 짧게 짚고 지웁니다.
+  */
+  .pick--wrong {
+    background: var(--pen-tint);
+    border-color: var(--pen);
+    color: var(--pen-deep);
+    animation: pick-shake 0.3s ease;
+  }
+
+  @keyframes pick-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+
   /* ---------- 유형 태그 ---------- */
   .tag {
     display: inline-flex;

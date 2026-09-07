@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { hasChoices } from '@/lib/choices';
 import { getSet } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
@@ -16,6 +17,13 @@ export default async function SetPage({ params }: { params: Promise<{ id: string
 
   const { view } = await readActiveProfile();
   const isParent = view === 'parent';
+
+  /*
+    고를 것이 하나도 없는 세트에는 링크를 두지 않습니다.
+    1·2단계처럼 받침이 ㄴ·ㅇ뿐인 낱말만 있으면 귀로 못 가릴 자리가 없습니다 —
+    눌러 봐야 「고를 것이 없어요」가 나오는 문을 만들지 않습니다.
+  */
+  const hasChoice = set.sentences.some(hasChoices);
 
   return (
     <main className="page">
@@ -75,6 +83,26 @@ export default async function SetPage({ params }: { params: Promise<{ id: string
               </span>
             </Link>
           </div>
+
+          {/*
+            채점하는 모드가 아니라 카드로 두지 않습니다 — 시험보다 눈에 덜 띄어야 합니다.
+            키보드가 없는 자리(등교길·시험 직전)에서 손가락으로만 익히는 곳이라,
+            「연습」이라는 말도 쓰지 않습니다. mode=practice 는 채점을 하니까요.
+          */}
+          {hasChoice && (
+            <Link
+              href={`/dictation/${set.id}/choose`}
+              className="mt-3 flex items-center justify-between rounded px-1 py-2"
+            >
+              <span className="text-sm font-semibold" style={{ color: 'var(--ink-soft)' }}>
+                골라서 익히기
+                <span className="ml-1 font-normal" style={{ color: 'var(--ink-faint)' }}>
+                  · 키보드 없이 손가락으로 골라요. 점수는 남지 않아요
+                </span>
+              </span>
+              <span style={{ color: 'var(--ink-faint)' }}>›</span>
+            </Link>
+          )}
 
           <p className="mt-5 text-center text-xs leading-relaxed" style={{ color: 'var(--ink-faint)' }}>
             중간에 나가면 점수와 별이 남지 않아요.
