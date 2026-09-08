@@ -1,4 +1,4 @@
-import { findBuiltinSet, isBuiltinSetId } from '@/data/dictation-bank';
+import { DICTATION_BANK, findBuiltinSet, isBuiltinSetId } from '@/data/dictation-bank';
 import { hasChoices } from '@/lib/choices';
 import { createClient } from '@/lib/supabase/server';
 import { seoulWeekStart, toDateKeyInSeoul, type WrongNote } from '@/lib/review';
@@ -116,6 +116,67 @@ export async function getSet(id: string): Promise<SetDetail | null> {
     sentences: (items ?? []).map((i) => i.sentence as string),
     builtin: false,
   };
+}
+
+/**
+ * 오늘 바로 시작할 것 하나.
+ *
+ * 아이는 앱을 열 때마다 **홈 → 받아쓰기 → 스물세 장에서 세트 찾기**를 되풀이합니다.
+ * 매일 하는 일인데 매일 찾습니다. 홈에 한 장을 놓아 그 훑기를 없앱니다.
+ *
+ * **새 갈래를 만드는 게 아니라 있는 갈래로 더 빨리 가는 것입니다.**
+ * 그래서 화면도 목록과 **같은 카드**(`DictationSetCard`)를 씁니다 —
+ * 여기서만 다르게 생기면 아이가 두 벌을 익혀야 합니다.
+ *
+ * 고르는 차례:
+ *  1. **부모가 넣었는데 아직 한 번도 안 푼 것.** 학교에서 받아온 문제지가 오늘 할 일입니다.
+ *  2. 없으면 **아직 안 푼 가장 낮은 단계.** 「마지막에 풀던 것」이 아니라 **다음 것**입니다 —
+ *     3단계를 100점으로 끝낸 아이에게 3단계를 다시 권하면 앞으로 나아가지 않습니다.
+ *  3. 둘 다 없으면 null. 홈은 지금까지처럼 그립니다.
+ *
+ * 「듣고 고르기」로만 푼 것은 기록이 없어 계속 「안 푼 것」으로 남습니다. 그게 맞습니다 —
+ * 점수를 남기지 않는 모드라 「했다」고 셀 근거가 없습니다.
+ */
+export interface NextUp {
+  id: string;
+  name: string;
+  detail: string;
+  hasChoice: boolean;
+  /** 왜 골랐나. 화면의 제목이 갈립니다 */
+  reason: 'new' | 'next';
+}
+
+export async function getNextUp(childId: string): Promise<NextUp | null> {
+  // 둘을 나란히 부릅니다. 줄 세우면 도쿄를 두 번 다녀오는 시간이 그대로 쌓입니다.
+  const [sets, builtinBest] = await Promise.all([
+    listSets(childId),
+    builtinBestScores(childId),
+  ]);
+
+  // listSets 는 새로 만든 것부터 줍니다. `best === null` 이 「아직 안 풀었다」입니다.
+  const 새것 = sets.find((s) => s.best === null && s.count > 0);
+  if (새것) {
+    return {
+      id: 새것.id,
+      name: 새것.name,
+      detail: `문장 ${새것.count}개`,
+      hasChoice: 새것.hasChoice,
+      reason: 'new',
+    };
+  }
+
+  const 다음단계 = DICTATION_BANK.find((s) => !builtinBest.has(s.id));
+  if (다음단계) {
+    return {
+      id: 다음단계.id,
+      name: 다음단계.name,
+      detail: `${다음단계.focus} · ${다음단계.sentences.length}개`,
+      hasChoice: 다음단계.sentences.some(hasChoices),
+      reason: 'next',
+    };
+  }
+
+  return null;
 }
 
 /**

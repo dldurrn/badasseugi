@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { CoachMarks } from '@/components/CoachMarks';
+import { DictationSetCard } from '@/components/DictationSetCard';
 import { InstallCard } from '@/components/InstallCard';
-import { getHomeSummary } from '@/lib/data';
+import { getHomeSummary, getNextUp } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
 /**
@@ -15,8 +16,16 @@ export default async function HomePage() {
   const { view, child } = await readActiveProfile();
   const isParent = view === 'parent';
 
-  // 보호자 화면에는 아이의 오늘 요약을 띄우지 않습니다. 그 자리는 리포트가 맡습니다.
-  const summary = !isParent && child ? await getHomeSummary(child.id) : null;
+  /*
+    보호자 화면에는 아이의 오늘 요약을 띄우지 않습니다. 그 자리는 리포트가 맡습니다.
+    「바로 시작하기」도 마찬가지입니다 — 푸는 것은 아이 화면에서 합니다(지침 9).
+
+    둘을 나란히 부릅니다. 줄 세우면 도쿄 왕복이 그대로 더해져 홈이 그만큼 늦게 뜹니다.
+  */
+  const [summary, nextUp] =
+    !isParent && child
+      ? await Promise.all([getHomeSummary(child.id), getNextUp(child.id)])
+      : [null, null];
   const today = summary?.today ?? null;
   const activeNotes = summary?.activeNotes ?? 0;
   const trophyCount = summary?.trophyCount ?? 0;
@@ -105,6 +114,35 @@ export default async function HomePage() {
         </>
       ) : (
         <>
+          {/*
+            오늘 할 것 한 장.
+
+            아이는 매일 같은 일을 하는데도 매번 스물세 장을 훑어 세트를 찾았습니다.
+            여기 한 장을 놓으면 홈에서 **바로** 시작합니다.
+
+            목록과 **같은 카드**를 씁니다. 여기서만 다르게 생기면 같은 일을 하는 자리가
+            둘이 되어 아이가 두 벌을 익혀야 합니다.
+
+            제목이 갈리는 것은 「왜 이게 여기 있나」가 아이에게 다르기 때문입니다 —
+            부모가 넣어 준 새 문제와, 내가 다음에 할 단계는 같은 말이 아닙니다.
+          */}
+          {nextUp && (
+            <>
+              <h2 className="section-title mb-2">
+                {nextUp.reason === 'new' ? '새로 들어온 문제' : '다음은 이거예요'}
+              </h2>
+              <div className="mb-6">
+                <DictationSetCard
+                  href={`/dictation/${nextUp.id}`}
+                  name={nextUp.name}
+                  detail={nextUp.detail}
+                  isChild
+                  hasChoice={nextUp.hasChoice}
+                />
+              </div>
+            </>
+          )}
+
           <h2 className="section-title mb-2">오늘의 요약</h2>
           <div className="surface mb-3 p-5 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
             {today ? (
