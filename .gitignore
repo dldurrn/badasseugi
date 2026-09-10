@@ -8,3 +8,6 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# 인스타 카드는 결과물이라 저장소에 두지 않습니다. scripts/make-cards.cjs 로 다시 그립니다.
+insta/
