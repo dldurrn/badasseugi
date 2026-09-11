@@ -178,11 +178,18 @@ function labelPill(text = '맞춤법 한 문제', tone = 'grid') {
         fill="${fg}" text-anchor="middle">${esc(text)}</text>`;
 }
 
-/** 가운데 한 줄. 넘치면 글자를 줄입니다 — 릴스는 잘린 글자를 다시 볼 수 없습니다. */
+/**
+ * 가운데 한 줄. 넘치면 글자를 줄입니다 — 릴스는 잘린 글자를 다시 볼 수 없습니다.
+ *
+ * `xml:space="preserve"` 가 없으면 **연속 공백이 한 칸으로 접힙니다.**
+ * 「짓다 = 만들다   짖다 = 소리 내다」에서 사이를 벌려 둔 공백 셋이 사라져
+ * 두 항목이 한 줄로 붙어 읽혔습니다. 폭은 공백까지 재어 자리를 잡아 두는데
+ * 글자만 당겨지니, 잰 것과 그린 것이 어긋납니다.
+ */
 function fit(text, y, size, { color = INK, font = SERIF, weight = 400, maxW = W - PAD * 2 } = {}) {
   let s = size;
   while (widthOf(text, s) > maxW && s > 30) s -= 2;
-  return `<text x="${W / 2}" y="${y}" font-family="${font}" font-size="${s}"
+  return `<text x="${W / 2}" y="${y}" xml:space="preserve" font-family="${font}" font-size="${s}"
           font-weight="${weight}" fill="${color}" text-anchor="middle">${esc(text)}</text>`;
 }
 
@@ -351,33 +358,54 @@ function circleMark(cx, cy, p) {
 */
 const BONUS_H = 270;
 
-function comparePair(y, wrong, right) {
+/**
+ * 두 낱말을 한 상자에 나란히.
+ *
+ * **라벨과 취소선을 고를 수 있습니다.** 대개는 「틀린 표기 / 바른 표기」지만,
+ * 짓다·짖다처럼 **둘 다 맞는 말인데 뜻이 다른** 경우가 있습니다.
+ * 거기에 「틀린 표기」를 붙이면 그 자체가 거짓말이 됩니다 —
+ * 「지어요」는 이 문장에서 틀린 것이지 없는 말이 아닙니다.
+ *
+ * 그런 문항을 한 줄짜리 안내(bonusNote)로 밀어 넣었더니
+ * 「짓다 = 만들다 짖다 = 소리 내다」가 한 줄로 붙어 경계가 안 보였습니다.
+ * 견주는 것은 견주는 모양으로 그려야 합니다.
+ */
+function comparePair(y, left, right, opt = {}) {
+  const { leftLabel = '틀린 표기', rightLabel = '바른 표기', strike = true } = opt;
   const cw = (W - PAD * 2) / 2;
   const lx = PAD + cw / 2;
   const rx = PAD + cw + cw / 2;
   /*
     두 낱말이 같은 크기여야 나란히 견줍니다 — 한쪽만 작으면 그쪽이 덜 중요해 보입니다.
     「삼가해 주세요」처럼 긴 것이 칸을 넘으므로 **둘 다** 긴 쪽에 맞춰 줄입니다.
+    칸막이에 닿지 않게 넉넉히 뺍니다.
   */
-  // 칸막이에 닿지 않게 넉넉히 뺍니다 — 「삼가해 주세요」가 가운뎃줄에 붙었습니다.
   let size = 70;
-  while (Math.max(widthOf(wrong, size), widthOf(right, size)) > cw - 90 && size > 34) size -= 2;
-  const lw = widthOf(wrong, size) + 24;
+  while (Math.max(widthOf(left, size), widthOf(right, size)) > cw - 90 && size > 34) size -= 2;
+  const lw = widthOf(left, size) + 24;
+  // 라벨도 칸을 넘을 수 있습니다 — 「소리 내다」처럼 뜻 풀이가 오면 길어집니다.
+  let ls = 32;
+  while (Math.max(widthOf(leftLabel, ls), widthOf(rightLabel, ls)) > cw - 60 && ls > 20) ls -= 2;
+
   return `
   <rect x="${PAD}" y="${y}" width="${W - PAD * 2}" height="${BONUS_H}" rx="30"
         fill="#ffffff" stroke="${GRID_FAINT}" stroke-width="2.5"/>
   <line x1="${W / 2}" y1="${y + 46}" x2="${W / 2}" y2="${y + BONUS_H - 46}"
         stroke="${GRID_FAINT}" stroke-width="2"/>
   <text x="${lx}" y="${y + 150}" font-family="${SERIF}" font-size="${size}" font-weight="700"
-        fill="${INK_SOFT}" text-anchor="middle">${esc(wrong)}</text>
-  <line x1="${lx - lw / 2}" y1="${y + 128}" x2="${lx + lw / 2}" y2="${y + 128}"
-        stroke="${PEN}" stroke-width="7" stroke-linecap="round"/>
-  <text x="${lx}" y="${y + 214}" font-family="${SANS}" font-size="32" font-weight="700"
-        fill="${PEN}" text-anchor="middle">틀린 표기</text>
+        fill="${strike ? INK_SOFT : INK}" text-anchor="middle">${esc(left)}</text>
+  ${
+    strike
+      ? `<line x1="${lx - lw / 2}" y1="${y + 128}" x2="${lx + lw / 2}" y2="${y + 128}"
+              stroke="${PEN}" stroke-width="7" stroke-linecap="round"/>`
+      : ''
+  }
+  <text x="${lx}" y="${y + 214}" font-family="${SANS}" font-size="${ls}" font-weight="700"
+        fill="${strike ? PEN : INK_SOFT}" text-anchor="middle">${esc(leftLabel)}</text>
   <text x="${rx}" y="${y + 150}" font-family="${SERIF}" font-size="${size}" font-weight="700"
         fill="${GRID_DEEP}" text-anchor="middle">${esc(right)}</text>
-  <text x="${rx}" y="${y + 214}" font-family="${SANS}" font-size="32" font-weight="700"
-        fill="${GRID}" text-anchor="middle">바른 표기</text>`;
+  <text x="${rx}" y="${y + 214}" font-family="${SANS}" font-size="${ls}" font-weight="700"
+        fill="${strike ? GRID : INK_SOFT}" text-anchor="middle">${esc(rightLabel)}</text>`;
 }
 
 /** 짝이 아니라 목록인 문항(겹받침 같은)은 한 줄로 둡니다. */
@@ -390,10 +418,23 @@ function bonusNote(y, text) {
 
 function sceneWhy(q, reel, t) {
   const text = q.explanation.replace(/"([^"]*)"/g, '「$1」');
+  /*
+    보너스 상자는 세 모양입니다.
+      '한 줄 규칙'                        → 초록 상자 한 줄
+      { wrong, right }                    → 틀린 표기 / 바른 표기
+      { left, leftLabel, right, rightLabel } → 둘 다 맞는 말인데 뜻이 다를 때
+  */
+  const b = reel.bonus;
   const box =
-    typeof reel.bonus === 'string'
-      ? bonusNote(880, reel.bonus)
-      : comparePair(880, reel.bonus.wrong, reel.bonus.right);
+    typeof b === 'string'
+      ? bonusNote(880, b)
+      : 'wrong' in b
+        ? comparePair(880, b.wrong, b.right)
+        : comparePair(880, b.left, b.right, {
+            leftLabel: b.leftLabel,
+            rightLabel: b.rightLabel,
+            strike: false,
+          });
   return frame(`
   ${rise(at(t, 0, 0.3), labelPill('왜 그럴까요?', 'pen'), 16)}
   ${rise(at(t, 0.25, 0.45), lines(text, { y: 560, size: 60, gap: 96, color: INK, font: SANS }))}
@@ -500,33 +541,37 @@ const SFX = buildSfx();
 */
 const REELS = [
   {
-    file: '1_며칠',
-    id: 'myeochil-1',
+    file: '1_오랜만',
+    id: 'oraenman-1',
     format: 'dad',
-    // 「없는 말이었다」가 충격이라 끝까지 보게 합니다.
-    // 어느 쪽이 없는 말인지는 안 밝히니 훅에서 정답이 새지 않습니다.
-    hook: ['국어사전에 없는 말을', '저는 계속 썼습니다'],
-    bonus: { wrong: '몇일', right: '며칠' },
-  },
-  {
-    file: '2_같아요',
-    id: 'fill-1',
-    format: 'quiz',
-    // 단정이라 부모가 실제로 아이 공책을 들춰 보게 됩니다.
-    hook: ['우리 아이 공책에도', '분명 있을 겁니다'],
-    bonus: { wrong: '갔아요', right: '같아요' },
-  },
-  {
-    file: '3_웬떡',
-    id: 'waen-2',
-    format: 'dad',
-    hook: ['단톡방에 이렇게 쓰고', '아무도 안 고쳐줬습니다'],
     /*
-      짝(왠 떡/웬 떡)이 아니라 **규칙**을 넣습니다.
-      이 문항의 값어치는 「이 문장의 정답」이 아니라 「앞으로 안 틀리는 법」이라,
-      저장과 공유가 거기서 납니다.
+      훅에 「오랜만」을 쓸 수 없습니다 — 그게 정답이라 3초 세기 전에 답이 샙니다.
+      그래서 낱말 대신 **상황**만 만듭니다. 「동창」이면 오랜만에 연락하는
+      장면이 저절로 그려집니다.
     */
-    bonus: '「왠지」 말고는 전부 「웬」',
+    hook: ['동창한테 카톡 보내다', '세 번을 고쳐 썼습니다'],
+    bonus: { wrong: '오랫만', right: '오랜만' },
+  },
+  {
+    file: '2_짖어요',
+    id: 'jitda-2',
+    format: 'quiz',
+    // 틀렸을 때 벌어지는 일을 그림으로 보여 줍니다. 「짓다」는 오답 쪽이라 정답도 안 샙니다.
+    hook: ['받침 하나 때문에', '강아지가 밥을 짓습니다'],
+    /*
+      「틀린 표기 / 바른 표기」가 아니라 **뜻 라벨**을 답니다.
+      「지어요」는 틀린 표기가 아니라 **다른 뜻의 바른 말**이라,
+      「틀린 표기」라고 붙이면 그 자체가 거짓말이 됩니다.
+      취소선도 긋지 않습니다 — 없는 말이 아니니까요.
+    */
+    bonus: { left: '짓다', leftLabel: '만들다', right: '짖다', rightLabel: '소리 내다' },
+  },
+  {
+    file: '3_설거지',
+    id: 'seolgeoji-1',
+    format: 'dad',
+    hook: ['매일 하는 집안일인데', '쓸 줄은 몰랐습니다'],
+    bonus: { wrong: '설겆이', right: '설거지' },
   },
 ];
 
