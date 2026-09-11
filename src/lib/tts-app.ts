@@ -144,6 +144,63 @@ export function forgetFallback(): void {
   clearFallback();
 }
 
+/* ------------------------------------------------------------------ */
+/* 실제로 읽어 준 회사 기억하기                                          */
+/* ------------------------------------------------------------------ */
+
+const SERVED_KEY = 'badasseugi:tts-served';
+
+export interface ServedNote {
+  /** 서버가 실제로 소리를 만든 회사 */
+  engine: string;
+  /** 마지막으로 읽어 준 때 */
+  at: number;
+}
+
+/**
+ * **위의 `FallbackNote` 와 다른 것을 잽니다.**
+ *
+ * 그쪽은 「서버 음성을 아예 못 썼다」(브라우저 내장 음성으로 떨어짐)를 남깁니다.
+ * 이쪽은 **성공했을 때 누가 읽었는지**를 남깁니다.
+ *
+ * 둘을 갈라 둔 이유는 회사끼리의 폴백 때문입니다. 타입캐스트가 막혀
+ * Google 로 넘어가도 **소리는 정상적으로 납니다.** 그래서 `FallbackNote` 에는
+ * 아무것도 안 남고, 부모는 며칠째 다른 회사 소리를 듣고 있어도 모릅니다.
+ * 실제로 그랬습니다 — 설정 화면은 그 와중에 「Typecast 로 읽고 있어요」라고
+ * 말하고 있었습니다.
+ *
+ * 이걸 서버에 물어볼 수는 없습니다. 「막혔다」는 기억이 인스턴스 메모리에
+ * 10분만 살아서, 같은 상태인데도 새로고침할 때마다 답이 달라집니다.
+ */
+function noteServed(engine: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SERVED_KEY, JSON.stringify({ engine, at: Date.now() }));
+  } catch {
+    // 저장이 막혀 있어도 소리는 나야 합니다.
+  }
+}
+
+/** 보호자 설정 화면이 읽습니다. 아직 한 번도 안 들었으면 null 입니다. */
+export function readServed(): ServedNote | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(SERVED_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ServedNote>;
+    if (typeof parsed.at !== 'number' || typeof parsed.engine !== 'string') return null;
+    return { engine: parsed.engine, at: parsed.at };
+  } catch {
+    return null;
+  }
+}
+
+/*
+  지우는 함수는 두지 않습니다. 이건 「마지막으로 실제 이렇게 났다」는 사실이라
+  시간이 지나도 틀린 말이 되지 않습니다. 부모가 회사를 바꾸면 그 자리에서
+  한 문장을 읽어 주므로(chooseEngine) 기록이 저절로 새로 쓰입니다.
+*/
+
 async function fetchAudio(
   text: string,
   rate: number,
@@ -167,6 +224,10 @@ async function fetchAudio(
 
     if (response.status === 503) return { kind: 'disabled' };
     if (!response.ok) return { kind: 'failed', status: response.status };
+
+    // 서버가 실제로 어느 회사로 읽었는지. 없으면(옛 배포) 건드리지 않습니다.
+    const served = response.headers.get('X-Tts-Engine');
+    if (served) noteServed(served);
 
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);

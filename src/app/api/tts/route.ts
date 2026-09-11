@@ -162,6 +162,19 @@ export async function POST(request: Request) {
       'Content-Length': String(result.audio.byteLength),
       // 같은 문장을 여러 번 듣는 앱이라 브라우저에도 남겨 둡니다.
       'Cache-Control': 'private, max-age=86400',
+      /*
+        **실제로 읽어 준 회사.** 몸통이 소리라 헤더로 보냅니다.
+
+        이게 없으면 설정 화면은 「누구로 읽겠다」(pickEngine 의 예정)를
+        「누구로 읽었다」처럼 말합니다. 실제로 타입캐스트가 403 으로 막혀
+        Google 이 읽던 며칠 동안 화면은 「지금 Typecast 로 읽고 있어요」라고
+        했습니다 — 안 알리는 것보다 나쁩니다. 잘못 알리니까요.
+
+        회사끼리의 폴백은 소리가 정상적으로 나기 때문에 `FallbackNote` 에도
+        안 잡힙니다(그건 브라우저 내장 음성으로 떨어질 때만 남습니다).
+        그래서 성공한 요청도 무엇으로 성공했는지 말해 줘야 합니다.
+      */
+      'X-Tts-Engine': served.name,
     },
   });
 }

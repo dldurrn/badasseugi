@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SpeechController } from '@/lib/tts';
-import { appSpeech, clearVoiceCache, setActiveVoice } from '@/lib/tts-app';
+import { appSpeech, clearVoiceCache, readServed, setActiveVoice } from '@/lib/tts-app';
+import { engineLine } from '@/lib/tts-status';
 import { saveSettings } from '@/lib/save-settings';
 import type { EnginePref } from '@/lib/settings';
 import type { SpeechRate } from '@/lib/tts';
@@ -69,17 +70,6 @@ function labelledGroups(voices: VoiceOption[]): Group[] {
 }
 
 const SAMPLE = '나는 학교에 갔어요.';
-
-/**
- * 회사 이름은 영어 그대로 씁니다.
- *
- * 「타입캐스트」로 적으면 부모가 검색해 볼 때 안 나옵니다 —
- * 요금제를 보러 가거나 지원에 물어볼 때 쓰는 이름은 영어 쪽입니다.
- */
-const ENGINE_LABEL: Record<string, string> = {
-  typecast: 'Typecast',
-  google: 'Google',
-};
 
 /*
   회사를 고르는 자리.
@@ -331,6 +321,12 @@ export function VoiceSettings({
   const [defaultVoice, setDefaultVoice] = useState<string | null>(null);
   /** 지금 소리를 만드는 회사. 보호자 화면에만 밝힙니다. */
   const [engine, setEngine] = useState<string | null>(null);
+  /*
+    이 기기에서 마지막으로 **실제로** 읽어 준 회사.
+    서버에 물어볼 수 없는 값입니다 — 「막혔다」는 기억이 인스턴스 메모리에
+    10분만 살아서, 같은 상태인데도 새로고침할 때마다 답이 달라집니다.
+  */
+  const [served, setServed] = useState<string | null>(null);
   /** 부모가 골라 둔 것. 'auto' 면 서버가 정합니다. */
   const [pref, setPref] = useState<EnginePref>('auto');
   /** 키가 꽂혀 있어 고를 수 있는 회사들. 하나뿐이면 고를 거리를 안 그립니다. */
@@ -371,9 +367,16 @@ export function VoiceSettings({
     }
   }, []);
 
+  /*
+    한 문장 들려준 뒤에 다시 읽습니다. 그 재생이 바로 「실제로 무엇이 읽었나」의
+    답을 기기에 적어 두기 때문입니다 — 화면을 새로 열지 않아도 그 자리에서 바뀝니다.
+  */
+  const refreshServed = useCallback(() => setServed(readServed()?.engine ?? null), []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    refreshServed();
+  }, [load, refreshServed]);
 
   const groups = useMemo(
     () => (voices ? buildGroups(voices, defaultVoice) : []),
@@ -440,6 +443,7 @@ export function VoiceSettings({
     const speech = new SpeechController(appSpeech);
     await speech.play(SAMPLE, rate, 'flow');
     setPlaying(null);
+    refreshServed();
   };
 
   const choose = async (name: string) => {
@@ -454,6 +458,7 @@ export function VoiceSettings({
     const speech = new SpeechController(appSpeech);
     await speech.play(SAMPLE, rate, 'flow');
     setPlaying(null);
+    refreshServed();
   };
 
   return (
@@ -473,8 +478,7 @@ export function VoiceSettings({
       */}
       {scope === 'family' && engine && available.length < 2 && (
         <p className="mb-2 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
-          지금 <b style={{ color: 'var(--ink-soft)' }}>{ENGINE_LABEL[engine] ?? engine}</b>로 읽고
-          있어요
+          {engineLine(engine, served, pref).text}
         </p>
       )}
 
@@ -509,11 +513,23 @@ export function VoiceSettings({
               </button>
             ))}
           </div>
-          <p className="mt-1.5 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
-            지금 <b style={{ color: 'var(--ink-soft)' }}>{ENGINE_LABEL[engine] ?? engine}</b>로 읽고
-            있어요
-            {pref !== 'auto' && ' · 고른 쪽이 막히면 다른 쪽으로 넘어가요'}
-          </p>
+          {(() => {
+            const line = engineLine(engine, served, pref);
+            return (
+              <p
+                className="mt-1.5 px-1 text-[11.5px]"
+                /* 넘어간 상태는 빨간펜 색으로 짚습니다 — 부모가 손을 써야 하는 유일한 경우입니다. */
+                style={{ color: line.warn ? 'var(--pen)' : 'var(--ink-faint)' }}
+              >
+                {line.text}
+                {/*
+                  「막히면 넘어간다」는 안내는 **아직 안 넘어갔을 때만** 뜻이 있습니다.
+                  이미 넘어간 마당에 같은 말을 붙이면 무슨 일이 일어난 건지 흐려집니다.
+                */}
+                {!line.warn && pref !== 'auto' && ' · 고른 쪽이 막히면 다른 쪽으로 넘어가요'}
+              </p>
+            );
+          })()}
         </div>
       )}
 
