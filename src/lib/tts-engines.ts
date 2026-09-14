@@ -184,12 +184,22 @@ export interface Engine {
  * 키를 지우면 곧바로 Google로 돌아갑니다 — 되돌리기가 쉬워야 합니다.
  */
 /**
- * 타입캐스트 무료 요금제에서 하루에 쓸 수 있는 최대 글자 수.
+ * 타입캐스트 하루 한도(가족당)의 **기본값** — `TYPECAST_DAILY_LIMIT` 이 없을 때.
  *
- * 월 15,000자를 서른으로 나눈 값입니다.
- * 이 위로 올리면 회사가 남용으로 보고 합성을 막아 버립니다.
+ * 무료 요금제(월 15,000자)를 서른으로 나눈 값입니다.
+ * 운영은 유료(Lite, 월 200,000자)라 Vercel 에서 `TYPECAST_DAILY_LIMIT` 로 올려 씁니다.
+ *
+ * 기본을 무료 기준으로 낮게 두는 이유는, 설정을 새 환경으로 옮기거나
+ * 무료 키로 시험해 보는 날에도 계정이 막히지 않게 하려는 것입니다.
+ * **올리는 것은 언제나 명시적으로** 합니다.
  */
-const TYPECAST_MAX_DAILY = 500;
+const TYPECAST_DEFAULT_DAILY = 500;
+
+/** 양의 숫자가 아니면 기본값. 빈 문자열·오타가 한도 0(= 타입캐스트 꺼짐)으로 새지 않게 합니다. */
+function readDailyLimit(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
 
 /* ------------------------------------------------------------------ */
 /* 막힌 회사 기억하기                                                    */
@@ -198,8 +208,8 @@ const TYPECAST_MAX_DAILY = 500;
 /* 문장마다 한 번씩 헛걸음을 하면 아이가 「문장 듣기」를 누를 때마다        */
 /* 그만큼 기다립니다. 한 번 막힌 걸 알면 잠시 건너뜁니다.                  */
 /*                                                                     */
-/* 영원히 기억하지는 않습니다 — 요금제를 올리거나 다음 달이 되면 풀리는데,   */
-/* 그때 서버를 다시 띄워야 돌아온다면 그것도 곤란합니다.                   */
+/* 영원히 기억하지는 않습니다 — 결제하거나 공급자가 풀어 주면 곧바로       */
+/* 돌아와야 하는데, 그때 서버를 다시 띄워야 한다면 그것도 곤란합니다.       */
 /* ------------------------------------------------------------------ */
 
 const BLOCK_MEMORY_MS = 10 * 60_000;
@@ -305,19 +315,19 @@ function typecastEngine(): Engine | null {
       defaultVoice: process.env.TYPECAST_VOICE_ID ?? DEFAULT_TYPECAST_VOICE,
       voicePattern: /^(tc|uc)_[0-9a-f]{24}$/,
       /*
-        무료 한도가 월 15,000자라 서른으로 나눠 하루 500자로 잡습니다.
+        **Google 과 변수를 나눕니다 — `TTS_DAILY_LIMIT` 은 아예 안 봅니다.**
 
-        **환경 변수로도 이 위로는 못 올립니다.**
-        `TTS_DAILY_LIMIT` 하나를 두 회사가 나눠 쓰는데 감당하는 양이 40배 다릅니다.
-        Google 기준(20,000)을 넣어 둔 채 타입캐스트로 바꾸면
-        월 한도를 하루에 넘겨 쓸 수 있게 되고, 그러면 회사가 계정을 막습니다.
-        실제로 그렇게 막혔습니다 — 합성 요청이 403 UNUSUAL_ACTIVITY_DETECTED를 받았습니다.
-        한도를 넘겨 쓰는 것보다 하루치를 다 못 쓰는 쪽이 낫습니다.
+        예전에는 그 변수 하나를 두 회사가 나눠 썼는데 감당하는 양이 40배 달라,
+        Google 기준(20,000)을 넣어 둔 채 타입캐스트로 바꾸면 무료 월 한도를
+        하루에 넘길 수 있었습니다. 그걸 막으려고 500에 못을 박아 두었더니,
+        이번에는 유료로 바꿔도 올릴 길이 없었습니다 — 돈을 내고도 하루 두세 세션 뒤엔
+        Google 로 읽었습니다. 변수를 가르면 두 걱정이 같이 풀립니다.
+
+        (2026-09 무료 키가 403 UNUSUAL_ACTIVITY_DETECTED 로 막혔을 때 사용량은
+        15,000자 중 834자였습니다. 원인은 한도가 아니라 공급자의 「IP당 무료 계정 1개」
+        정책이었고, 결제로 풀었습니다. 한도 상한이 그 차단을 막아 준 것은 아닙니다.)
       */
-      dailyLimit: Math.min(
-        Number(process.env.TTS_DAILY_LIMIT ?? TYPECAST_MAX_DAILY),
-        TYPECAST_MAX_DAILY,
-      ),
+      dailyLimit: readDailyLimit(process.env.TYPECAST_DAILY_LIMIT, TYPECAST_DEFAULT_DAILY),
       synthesize: (req) => synthesizeWithTypecast(typecastKey, req),
     };
   }

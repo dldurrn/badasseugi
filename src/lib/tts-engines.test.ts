@@ -27,6 +27,7 @@ beforeEach(() => {
   process.env.TYPECAST_API_KEY = 'test-typecast';
   process.env.GOOGLE_TTS_API_KEY = 'test-google';
   delete process.env.TTS_DAILY_LIMIT;
+  delete process.env.TYPECAST_DAILY_LIMIT;
   /*
     막힘 기억은 모듈에 붙어 있어 테스트끼리 이어집니다.
     한 테스트가 막아 둔 것이 다음 테스트의 순서를 뒤바꿔,
@@ -121,27 +122,33 @@ describe('고를 수 있는 회사', () => {
   });
 });
 
-describe('하루 한도 — 타입캐스트는 환경 변수로도 못 올린다', () => {
-  it('아무것도 안 정하면 500자', () => {
+describe('하루 한도 — 타입캐스트는 자기 변수만 봅니다', () => {
+  it('아무것도 안 정하면 500자 — 무료 키로 옮겨 와도 계정이 안 막히게', () => {
     const typecast = 회사('typecast');
     expect(typecast.dailyLimit).toBe(500);
   });
 
-  it('Google 기준(20,000)을 넣어도 타입캐스트는 500에서 멈춘다', () => {
-    // 이게 바로 계정이 막힌 원인이었습니다.
-    // 월 15,000자짜리 요금제에 하루 20,000자를 허용하고 있었습니다.
+  it('TYPECAST_DAILY_LIMIT 로 올립니다 — 유료 요금제', () => {
+    process.env.TYPECAST_DAILY_LIMIT = '2000';
+    const typecast = 회사('typecast');
+    expect(typecast.dailyLimit).toBe(2000);
+  });
+
+  it('Google 기준(TTS_DAILY_LIMIT=20,000)은 타입캐스트에 번지지 않습니다', () => {
+    // 두 회사가 한 변수를 나눠 쓰던 때, 무료 타입캐스트에 하루 20,000자를 허용하고 있었습니다.
+    // 변수를 가른 이유가 이것이라, 가른 것이 다시 붙지 않는지 지킵니다.
     process.env.TTS_DAILY_LIMIT = '20000';
     const typecast = 회사('typecast');
     expect(typecast.dailyLimit).toBe(500);
   });
 
-  it('더 낮추는 것은 됩니다', () => {
-    process.env.TTS_DAILY_LIMIT = '200';
+  it.each(['', 'abc', '0', '-5'])('이상한 값(%j)이면 기본값 — 한도 0으로 새지 않는다', (raw) => {
+    process.env.TYPECAST_DAILY_LIMIT = raw;
     const typecast = 회사('typecast');
-    expect(typecast.dailyLimit).toBe(200);
+    expect(typecast.dailyLimit).toBe(500);
   });
 
-  it('Google은 그 상한을 받지 않습니다 — 월 100만 자라 사정이 다릅니다', () => {
+  it('Google은 TTS_DAILY_LIMIT 을 그대로 씁니다 — 월 100만 자라 사정이 다릅니다', () => {
     delete process.env.TYPECAST_API_KEY;
     process.env.TTS_DAILY_LIMIT = '20000';
     const google = 회사('google');

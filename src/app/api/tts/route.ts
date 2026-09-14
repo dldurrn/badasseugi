@@ -85,7 +85,7 @@ export async function POST(request: Request) {
   /*
     **한국 날짜**로 셉니다. toISOString() 은 UTC 라 하루가 아침 9시에 바뀝니다 —
     아이가 아침에 받아쓰기를 하면 어제 몫을 이어 쓰고,
-    밤 9시가 넘으면 하루치가 새로 열립니다. 타입캐스트는 하루 500자라 실제로 문제가 됩니다.
+    밤 9시가 넘으면 하루치가 새로 열립니다. 하루 한도가 빠듯한 회사일수록 실제로 문제가 됩니다.
   */
   const today = toDateKeyInSeoul();
 
