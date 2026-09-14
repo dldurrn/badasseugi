@@ -55,6 +55,28 @@ describe('engineLine — 부모에게 무엇을 말하나', () => {
     });
   });
 
+  describe('회사를 막 바꿔 들어 보는 중일 때', () => {
+    /*
+      Google → Typecast 로 누른 직후에는 기록이 아직 Google 입니다.
+      그 틈에 견주면 멀쩡한 Typecast 가 막혔다고 나옵니다 — 실제로 그렇게 보고됐습니다.
+    */
+    it('예전 기록이 남아 있어도 막혔다고 하지 않는다', () => {
+      const line = engineLine('typecast', 'google', 'typecast', true);
+      expect(line.warn).toBe(false);
+      expect(line.text).not.toContain('막혀');
+      expect(line.text).toBe('들어 보는 중…');
+    });
+
+    it('어느 회사가 읽었다고도 말하지 않는다 — 아직 모른다', () => {
+      const line = engineLine('typecast', 'typecast', 'typecast', true);
+      expect(line.text).not.toContain('읽었어요');
+    });
+
+    it('다 듣고 나면 원래대로 판정한다', () => {
+      expect(engineLine('google', 'google', 'typecast', false).warn).toBe(true);
+    });
+  });
+
   describe('자동으로 두었을 때', () => {
     /*
       「알아서 골라 달라」고 한 것이라 어느 쪽이 읽어도 어긋난 것이 아닙니다.

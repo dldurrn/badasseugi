@@ -225,11 +225,21 @@ async function fetchAudio(
     if (response.status === 503) return { kind: 'disabled' };
     if (!response.ok) return { kind: 'failed', status: response.status };
 
+    /*
+      이미 버린 요청의 응답은 **기록에도 캐시에도 남기지 않습니다.**
+
+      설정 화면에서 회사를 빠르게 번갈아 누르면 앞서 누른 것의 응답이 나중에 닿을 수 있습니다.
+      그걸 적으면 마지막으로 누른 것이 Typecast 인데 기록은 Google 로 남아
+      「막혀서 Google로 읽고 있어요」가 들러붙습니다. 누른 순서가 아니라 도착 순서가 이기는 셈입니다.
+    */
+    if (signal.aborted) return { kind: 'failed' };
+
     // 서버가 실제로 어느 회사로 읽었는지. 없으면(옛 배포) 건드리지 않습니다.
     const served = response.headers.get('X-Tts-Engine');
     if (served) noteServed(served);
 
     const blob = await response.blob();
+    if (signal.aborted) return { kind: 'failed' };
     const url = URL.createObjectURL(blob);
     remember(key, url);
     return { kind: 'ok', url };

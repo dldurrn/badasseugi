@@ -43,8 +43,24 @@ export interface EngineLine {
  * @param planned 서버가 1순위로 고른 회사. **예정이지 사실이 아닙니다**
  * @param served  이 기기에서 마지막으로 **실제로** 읽어 준 회사. 없으면 아직 안 들은 것
  * @param pref    부모가 골라 둔 것. 'auto' 면 고른 것이 없습니다
+ * @param checking 회사를 막 바꿔 예시 문장을 들려주는 중인가
  */
-export function engineLine(planned: string, served: string | null, pref: EnginePref): EngineLine {
+export function engineLine(
+  planned: string,
+  served: string | null,
+  pref: EnginePref,
+  checking = false,
+): EngineLine {
+  /*
+    회사를 바꾸는 동안에는 **판정하지 않습니다.**
+
+    고른 값(pref)은 누르자마자 바뀌는데, 실제로 읽은 기록(served)은
+    저장 → 목록 → 합성 → 재생이 끝나야 따라옵니다. 그 3~4초 사이에 둘을 견주면
+    **직전에 누른 회사**의 기록이 남아 있어 「고르신 Typecast가 막혀서 Google로 읽고 있어요」가 뜹니다.
+    아무것도 안 막혔는데 부모는 결제한 쪽이 고장 난 줄 압니다. 실제로 그랬습니다.
+  */
+  if (checking) return { text: '들어 보는 중…', warn: false };
+
   /*
     아직 이 기기에서 한 번도 안 들었으면 **예정이라고 말합니다.**
     여기서 「읽고 있어요」라고 하면 그게 바로 예전의 거짓말입니다.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SpeechController } from '@/lib/tts';
 import { appSpeech, clearVoiceCache, readServed, setActiveVoice } from '@/lib/tts-app';
 import { engineLine } from '@/lib/tts-status';
@@ -331,13 +331,39 @@ export function VoiceSettings({
   const [pref, setPref] = useState<EnginePref>('auto');
   /** 키가 꽂혀 있어 고를 수 있는 회사들. 하나뿐이면 고를 거리를 안 그립니다. */
   const [available, setAvailable] = useState<string[]>([]);
+  /** 회사를 막 바꿔 예시 문장을 들려주는 중. 이 동안은 「막혔다」를 판정하지 않습니다. */
+  const [checking, setChecking] = useState(false);
+
+  /*
+    **마지막으로 누른 것만 살립니다.**
+
+    회사를 빠르게 번갈아 누르면 누를 때마다 저장 → 목록 → 합성 → 재생이 따로 돌았습니다.
+    소리가 겹쳐 나고, 앞서 누른 것의 응답이 나중에 닿으면 그게 기록과 화면을 덮었습니다 —
+    마지막으로 누른 것이 Typecast 인데 「막혀서 Google로 읽고 있어요」가 남았습니다.
+
+    - 재생기는 하나만 둡니다. 새로 틀면 앞의 재생과 그 요청이 멈춥니다(`play` 가 `stop` 을 먼저 부릅니다).
+    - 누를 때마다 번호를 올리고, 기다린 뒤에 번호가 바뀌었으면 손을 뗍니다.
+    - 저장은 **누른 순서대로** 줄 세웁니다. 요청은 버려도 서버에 이미 닿은 쓰기는 못 거둬서,
+      나란히 보내면 앞서 누른 값이 나중에 저장될 수 있습니다.
+  */
+  const speechRef = useRef<SpeechController | null>(null);
+  const runRef = useRef(0);
+  const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  const speech = () => (speechRef.current ??= new SpeechController(appSpeech));
+
+  // 화면을 떠나면 들려주던 소리도 멈춥니다.
+  useEffect(() => () => speechRef.current?.stop(), []);
+
   /**
    * 목록과 기본값은 서버가 정합니다. 화면은 어느 회사인지 몰라도 됩니다.
    * 회사를 바꿀 때도 같은 함수를 씁니다 — 그때 목록이 통째로 갈립니다.
    *
    * 새로 켜질 목소리 이름을 돌려줍니다. 바꾸자마자 들려주려면 그게 필요합니다.
+   *
+   * `run` 을 주면, 응답이 닿았을 때 그사이 다른 것을 눌렀으면 화면을 건드리지 않습니다.
    */
-  const load = useCallback(async (): Promise<string | null> => {
+  const load = useCallback(async (run?: number): Promise<string | null> => {
     try {
       const r = await fetch('/api/tts/voices');
       const payload: {
@@ -347,6 +373,8 @@ export function VoiceSettings({
         pref?: EnginePref;
         available?: string[];
       } = r.ok ? await r.json() : { voices: [] };
+
+      if (run !== undefined && run !== runRef.current) return null;
 
       const list = payload.voices ?? [];
       setVoices(list);
@@ -362,7 +390,7 @@ export function VoiceSettings({
       setPicked(null);
       return payload.defaultVoice ?? list[0]?.name ?? null;
     } catch {
-      setVoices([]);
+      if (run === undefined || run === runRef.current) setVoices([]);
       return null;
     }
   }, []);
@@ -420,13 +448,22 @@ export function VoiceSettings({
     (다른 설정은 눌린 느낌이 먼저라 기다리지 않지만, 이건 응답이 곧 결과입니다.)
   */
   const chooseEngine = async (next: EnginePref) => {
+    const run = ++runRef.current;
+    const 지금것 = () => run === runRef.current;
+
+    // 앞서 누른 것의 소리와 요청을 멈춥니다. 겹쳐 나면 어느 쪽 소리인지 가릴 수 없습니다.
+    speechRef.current?.stop();
     setPref(next);
+    setChecking(true);
     /*
       목록을 비우지 않습니다. 아래에 「목록이 없으면 아무것도 안 그림」이 있어서,
       비우면 회사를 바꾸는 동안 **고르는 자리까지 통째로 사라집니다.**
       방금 누른 칩이 이미 켜져 있으니 반응은 그것으로 충분합니다.
     */
-    await saveSettings('family', { engine: next });
+    const saved = saveChainRef.current.then(() => saveSettings('family', { engine: next }));
+    saveChainRef.current = saved;
+    await saved;
+    if (!지금것()) return;
 
     /*
       담아 둔 소리는 **다른 회사가 만든 것**이라 버립니다.
@@ -434,19 +471,27 @@ export function VoiceSettings({
     */
     clearVoiceCache();
 
-    const 새목소리 = await load();
-    if (!새목소리) return;
+    const 새목소리 = await load(run);
+    if (!지금것()) return;
+    if (!새목소리) {
+      setChecking(false);
+      return;
+    }
 
     // 곧바로 들려줍니다 — 이 설정의 요점이 「어느 쪽 소리가 나은가」입니다.
     setActiveVoice(새목소리);
     setPlaying(새목소리);
-    const speech = new SpeechController(appSpeech);
-    await speech.play(SAMPLE, rate, 'flow');
+    await speech().play(SAMPLE, rate, 'flow');
+    // 그사이 다른 것을 눌렀으면 그쪽이 끝낼 때 정리합니다. 여기서 풀면 틈이 다시 생깁니다.
+    if (!지금것()) return;
     setPlaying(null);
     refreshServed();
+    setChecking(false);
   };
 
   const choose = async (name: string) => {
+    // 회사를 바꾸던 중에 목소리를 눌러도 이쪽이 마지막 것이 됩니다.
+    const run = ++runRef.current;
     setPicked(name);
     // 담아 둔 소리는 옛 목소리라 버리고, 이 화면의 미리듣기도 새 목소리로 납니다.
     setActiveVoice(name);
@@ -455,10 +500,11 @@ export function VoiceSettings({
 
     // 고르자마자 들려줍니다. 이름만 보고는 고를 수 없습니다.
     setPlaying(name);
-    const speech = new SpeechController(appSpeech);
-    await speech.play(SAMPLE, rate, 'flow');
+    await speech().play(SAMPLE, rate, 'flow');
+    if (run !== runRef.current) return;
     setPlaying(null);
     refreshServed();
+    setChecking(false);
   };
 
   return (
@@ -478,7 +524,7 @@ export function VoiceSettings({
       */}
       {scope === 'family' && engine && available.length < 2 && (
         <p className="mb-2 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
-          {engineLine(engine, served, pref).text}
+          {engineLine(engine, served, pref, checking).text}
         </p>
       )}
 
@@ -514,7 +560,7 @@ export function VoiceSettings({
             ))}
           </div>
           {(() => {
-            const line = engineLine(engine, served, pref);
+            const line = engineLine(engine, served, pref, checking);
             return (
               <p
                 className="mt-1.5 px-1 text-[11.5px]"
@@ -526,7 +572,7 @@ export function VoiceSettings({
                   「막히면 넘어간다」는 안내는 **아직 안 넘어갔을 때만** 뜻이 있습니다.
                   이미 넘어간 마당에 같은 말을 붙이면 무슨 일이 일어난 건지 흐려집니다.
                 */}
-                {!line.warn && pref !== 'auto' && ' · 고른 쪽이 막히면 다른 쪽으로 넘어가요'}
+                {!line.warn && !checking && pref !== 'auto' && ' · 고른 쪽이 막히면 다른 쪽으로 넘어가요'}
               </p>
             );
           })()}
