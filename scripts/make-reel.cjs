@@ -26,7 +26,7 @@ const sharp = require('sharp');
 const ffmpeg = require('ffmpeg-static');
 const {
   W, PAPER, PAPER_SUNK, INK, INK_SOFT, INK_FAINT, GRID, GRID_DEEP, GRID_FAINT, GRID_TINT,
-  PEN, PEN_TINT, SERIF, SANS, widthOf, esc, cell, lines, runs, loadBank,
+  PEN, PEN_TINT, SERIF, SANS, widthOf, esc, cell, lines, runs, loadBank, bankCounts,
 } = require('./make-cards.cjs');
 
 const H = 1920; // 9:16
@@ -455,7 +455,7 @@ function sceneCta(q, reel, t) {
   ${scaleAt(W / 2, 392, pop(t, 0, 0.35), cell(W / 2 - 92, 300, 184, '받'))}
   ${rise(at(t, 0.2, 0.32), fit('받아쓰기 공책', 600, 72, { weight: 700, color: GRID_DEEP }))}
   ${rise(at(t, 0.3, 0.32), fit('초등 1·2학년 받아쓰기 · 맞춤법', 678, 42, { font: SANS, color: INK_SOFT }))}
-  ${rise(at(t, 0.5, 0.32), fit('받아쓰기 20단계 · 맞춤법 76문제', 850, 46, { font: SANS, color: INK }))}
+  ${rise(at(t, 0.5, 0.32), fit(`받아쓰기 ${bankCounts().dictationLevels}단계 · 맞춤법 ${bankCounts().spelling}문제`, 850, 46, { font: SANS, color: INK }))}
   ${rise(at(t, 0.6, 0.32), fit('원고지 채점 · 오답노트', 928, 46, { font: SANS, color: INK }))}
   ${rise(at(t, 0.72, 0.32), fit('무료로 씁니다', 1040, 52, { font: SANS, weight: 700, color: GRID_DEEP }))}
   ${rise(
@@ -528,7 +528,7 @@ const SFX = buildSfx();
 
 /*
   `format` 이 말투를 정하고, `id` 가 문제를 정하고, `hook` 두 줄만 편마다 씁니다.
-  같은 문항도 형식이 다르면 다른 편이 되므로 76문항이 그대로 마르지 않습니다.
+  같은 문항도 형식이 다르면 다른 편이 되므로 문제은행이 쉽게 마르지 않습니다.
 */
 /*
   dad 2 : quiz 1 이고 **번갈아** 올립니다.
@@ -644,7 +644,7 @@ function encode(dir, out) {
 
 /*
   `--list` — 문제은행에 뭐가 있는지 봅니다.
-  릴스로 만들 문항을 고르려면 76개를 눈으로 훑어야 하는데,
+  릴스로 만들 문항을 고르려면 문제은행 전체를 눈으로 훑어야 하는데,
   그러자고 TypeScript 파일을 열게 하면 다음 편을 안 만들게 됩니다.
 */
 function printBank(bank) {

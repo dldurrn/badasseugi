@@ -4,7 +4,7 @@
   맞춤법 문제은행(src/data/spelling-bank.ts)의 문항을 그대로 카드 3장으로 만듭니다.
   문제 → 정답 → 왜 그런지. 캐러셀 한 게시물이 곧 문항 하나입니다.
 
-  손으로 다시 쓰지 않는 것이 요점입니다. 앱에 든 76문항이 그대로 소재라
+  손으로 다시 쓰지 않는 것이 요점입니다. 앱에 든 문항이 그대로 소재라
   카드 문구를 따로 관리하면 두 벌이 되고, 언젠가 앱과 인스타의 설명이 달라집니다.
 
   make-icons.cjs와 같은 방식(SVG → sharp)입니다. Vercel에는 한글 글꼴이 없으므로
@@ -329,7 +329,7 @@ function cardWhy(q) {
   ${cell(PAD + 44, H - 348, 100, '받')}
   <text x="${PAD + 184}" y="${H - 296}" font-family="${SERIF}" font-size="44" font-weight="700"
         fill="${GRID_DEEP}">받아쓰기 공책</text>
-  <text x="${PAD + 184}" y="${H - 244}" font-family="${SANS}" font-size="31" fill="${INK_SOFT}">맞춤법 76문제 · 받아쓰기 20단계</text>
+  <text x="${PAD + 184}" y="${H - 244}" font-family="${SANS}" font-size="31" fill="${INK_SOFT}">맞춤법 ${bankCounts().spelling}문제 · 받아쓰기 ${bankCounts().dictationLevels}단계</text>
   <text x="${PAD + 184}" y="${H - 196}" font-family="${SANS}" font-size="31" fill="${GRID_DEEP}">프로필 링크에서 바로 풀 수 있어요 ↑</text>`,
     // 상자 안에 이미 계정 이름이 있습니다. 아래에 또 적으면 같은 말이 두 번입니다.
     { footer: false },
@@ -375,10 +375,28 @@ const PICK = [
   릴스(make-reel.cjs)가 색·글꼴·격자·글자 폭 어림을 그대로 씁니다.
   두 벌로 두면 카드와 릴스가 언젠가 다른 물건처럼 보입니다 — 같은 계정인데요.
 */
+/**
+ * 문제은행에 든 개수. 카드·릴스의 안내 문구(「맞춤법 128문제 · 받아쓰기 20단계」)가 씁니다.
+ *
+ * **숫자를 손으로 적지 않습니다.** 맞춤법을 76 → 128문항으로 늘린 날,
+ * 두 스크립트에 「76문제」가 박혀 있어 새로 뽑은 영상이 틀린 숫자를 말할 뻔했습니다.
+ * 영상에 박힌 글자는 올린 뒤에 못 고치니, 뽑을 때마다 셉니다.
+ */
+let counted = null;
+function bankCounts() {
+  if (counted) return counted;
+  const dictation = fs.readFileSync(path.join(__dirname, '..', 'src/data/dictation-bank.ts'), 'utf8');
+  counted = {
+    spelling: Object.keys(loadBank()).length,
+    dictationLevels: new Set([...dictation.matchAll(/id:\s*'(lv\d+)'/g)].map((m) => m[1])).size,
+  };
+  return counted;
+}
+
 module.exports = {
   W, H, PAD, PAPER, PAPER_SUNK, INK, INK_SOFT, INK_FAINT,
   GRID, GRID_DEEP, GRID_FAINT, GRID_TINT, PEN, PEN_TINT,
-  SERIF, SANS, widthOf, wrap, esc, cell, lines, lineCount, loadBank, runs,
+  SERIF, SANS, widthOf, wrap, esc, cell, lines, lineCount, loadBank, runs, bankCounts,
 };
 
 // 직접 실행할 때만 그립니다. require 로 부품만 가져다 쓸 때는 안 돕니다.
