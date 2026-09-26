@@ -14,7 +14,7 @@ import { TabBar } from '@/components/TabBar';
  */
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
   ? `https://${process.env.NEXT_PUBLIC_SITE_URL.replace(/^https?:\/\//, '')}`
-  : 'https://badasseugi-wine.vercel.app';
+  : 'https://badasseugi.com';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

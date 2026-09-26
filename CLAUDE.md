@@ -862,7 +862,7 @@ level은 지금 데이터에만 있고 화면에서 난이도를 고르는 기�
 
 | | |
 |---|---|
-| 주소 | badasseugi-wine.vercel.app |
+| 주소 | badasseugi.com (www 없는 쪽이 대표, www는 그리로 넘김. 옛 badasseugi-wine.vercel.app 도 살아 있음) |
 | 앱 서버 | Vercel 서울(`icn1`) |
 | 데이터베이스 | Supabase 도쿄(`ap-northeast-1`) — **리전은 나중에 못 바꿉니다** |
 | 음성 | 타입캐스트 (키를 지우면 Google로) |
