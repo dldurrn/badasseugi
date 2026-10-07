@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DICTATION_BANK } from '@/data/dictation-bank';
-import { align, grade, type Column } from './grading';
+import { align, grade, spacingHint, type Column } from './grading';
 import { toGradeCells } from './grade-cells';
 import { compose, decompose } from './hangul';
 
@@ -246,5 +246,24 @@ describe('망가뜨리지 않았다', () => {
       const ops = align(a, b);
       expect(ops.every((o) => o.type === 'eq' || o.type === 'sub'), `${a}/${b}`).toBe(true);
     }
+  });
+});
+
+describe('spacingHint — 아이가 무엇을 했는지부터 말합니다', () => {
+  it('붙여 쓴 아이에게는 「붙여 썼어요」', () => {
+    expect(spacingHint(grade('파란 하늘', '파란하늘').columns)).toMatch(/^붙여 썼어요/);
+  });
+
+  it('더 띄운 아이에게는 「띄어 썼어요」', () => {
+    expect(spacingHint(grade('맑습니다.', '맑 습니다.').columns)).toMatch(/^띄어 썼어요/);
+  });
+
+  it('둘이 섞이면 방향을 각각 말합니다', () => {
+    const r = grade('파란 하늘이에요 정말', '파란하늘이에요 정 말');
+    expect(spacingHint(r.columns)).toMatch(/∨.*✕/);
+  });
+
+  it('띄어쓰기 열이 없으면 예전 설명으로 내려갑니다', () => {
+    expect(spacingHint(grade('포도', '포도').columns)).toContain('∨');
   });
 });

@@ -4,6 +4,7 @@ import { toGradeCells, toGradeRows, type GradeCell } from '@/lib/grade-cells';
 import {
   ERROR_HINT,
   ERROR_LABEL,
+  spacingHint,
   type Column,
   type GradeResult,
 } from '@/lib/grading';
@@ -375,7 +376,7 @@ export function GradeSheet({
         {result.errorTypes.map((t) => (
           <div key={t} className="flex items-start gap-2.5 text-sm leading-relaxed">
             <span className={`tag tag--${t} mt-0.5`}>{ERROR_LABEL[t]}</span>
-            <span style={{ color: 'var(--ink-soft)' }}>{ERROR_HINT[t]}</span>
+            <span style={{ color: 'var(--ink-soft)' }}>{t === 'spacing' ? spacingHint(result.columns) : ERROR_HINT[t]}</span>
           </div>
         ))}
       </div>

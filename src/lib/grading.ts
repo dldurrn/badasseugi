@@ -42,6 +42,23 @@ export const ERROR_HINT: Record<ErrorType, string> = {
   letter: '정답과 나란히 놓고 어떤 글자가 다른지 봐요.',
 };
 
+/**
+ * 띄어쓰기 오류의 한 줄 설명 — **아이가 무엇을 했는지**부터 말합니다.
+ *
+ * 「∨ 표시가 있는 곳에서 한 칸 띄어 써요」는 규칙만 말합니다. 붙여 쓴 아이의 윗줄에는
+ * 세로 짝을 맞추려고 ∨ 칸이 끼어 있어서, 「나는 띄어 썼는데?」로 읽힐 수 있습니다.
+ * 그래서 먼저 「붙여 썼어요」라고 말해 주고 나서 표시를 가리킵니다.
+ * 붙여 쓴 것(∨)과 더 띄운 것(✕)은 반대 방향이라 말도 갈라야 합니다.
+ */
+export function spacingHint(columns: Column[]): string {
+  const need = columns.some((c) => c.kind === 'needSpace');
+  const extra = columns.some((c) => c.kind === 'extraSpace');
+  if (need && extra) return '붙여 쓴 곳과 띄어 쓴 곳이 있어요. ∨는 한 칸 띄고, ✕는 붙여 써요.';
+  if (need) return '붙여 썼어요. ∨ 표시가 있는 곳에서 한 칸 띄어 써요.';
+  if (extra) return '띄어 썼어요. ✕ 표시가 있는 곳은 붙여 써요.';
+  return ERROR_HINT.spacing;
+}
+
 /** 정렬 연산 한 단위. */
 export type AlignOp =
   | { type: 'eq'; answer: string; input: string }
