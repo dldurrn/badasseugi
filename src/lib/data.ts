@@ -1,5 +1,6 @@
 import { DICTATION_BANK, findBuiltinSet, isBuiltinSetId } from '@/data/dictation-bank';
 import { hasChoices } from '@/lib/choices';
+import { isHiddenFor } from '@/lib/visibility';
 import { createClient } from '@/lib/supabase/server';
 import { seoulWeekStart, toDateKeyInSeoul, type WrongNote } from '@/lib/review';
 import { buildTracks, daysIntoWeek, type Track } from '@/lib/report';
@@ -31,8 +32,22 @@ export interface SetSummary {
    * 나오는 버튼을 만들지 않으려는 것이고, 세트 상세 화면과 같은 판정입니다.
    */
   hasChoice: boolean;
+  /**
+   * 이 세트를 숨겨 둔 아이들의 id.
+   *
+   * 아이 화면에서는 자기가 숨겨진 세트를 아예 돌려주지 않으므로 늘 비어 있습니다.
+   * 보호자 화면에서만 의미가 있습니다 — 체크 모드가 이것을 그립니다.
+   */
+  hiddenFor: string[];
 }
 
+/**
+ * 직접 넣은 세트 목록.
+ *
+ * `childId` 가 있으면(아이 화면) **그 아이에게 숨긴 세트는 빼고** 돌려줍니다.
+ * 홈의 「오늘 할 것」(getNextUp)도 이 함수를 거치므로 숨긴 세트가 거기 뜨지 않습니다.
+ * 없으면(보호자 화면) 전부 돌려주고 누구에게 숨겼는지만 `hiddenFor` 에 담습니다.
+ */
 export async function listSets(childId: string | null): Promise<SetSummary[]> {
   const supabase = await createClient();
 
@@ -43,11 +58,26 @@ export async function listSets(childId: string | null): Promise<SetSummary[]> {
     그릴지 정하려면 문장이 있어야 합니다. 개수를 따로 세고 문장을 또 물으면
     **도쿄를 두 번 왕복**하므로, 한 번에 받아 여기서 둘 다 셈합니다.
     한 집의 문장은 다 합쳐야 몇 킬로바이트라 왕복 한 번보다 쌉니다.
+
+    숨김(set_hidden)도 같은 질의에 얹습니다. 따로 물으면 또 한 번 왕복입니다.
   */
-  const { data: sets } = await supabase
+  let { data: sets, error } = await supabase
     .from('sets')
-    .select('id, name, created_at, set_items(sentence)')
+    .select('id, name, created_at, set_items(sentence), set_hidden(child_id)')
     .order('created_at', { ascending: false });
+
+  if (error) {
+    /*
+      표가 아직 없으면(마이그레이션 0010 전) **조회 전체가 실패합니다.**
+      새 표 하나 때문에 세트 목록이 통째로 비면 안 되므로 예전 칸만으로 한 번 더 묻습니다.
+      배포와 마이그레이션의 순서에 앱이 매달리지 않게요.
+    */
+    const retry = await supabase
+      .from('sets')
+      .select('id, name, created_at, set_items(sentence)')
+      .order('created_at', { ascending: false });
+    sets = retry.data as typeof sets;
+  }
 
   if (!sets) return [];
 
@@ -68,18 +98,28 @@ export async function listSets(childId: string | null): Promise<SetSummary[]> {
     }
   }
 
-  return sets.map((row) => {
+  const out: SetSummary[] = [];
+  for (const row of sets) {
     const items = (row.set_items as unknown as Array<{ sentence: string }> | null) ?? [];
+    const hiddenFor = (
+      ((row as { set_hidden?: Array<{ child_id: string }> | null }).set_hidden ?? []).map(
+        (h) => h.child_id,
+      )
+    );
+    if (isHiddenFor(hiddenFor, childId)) continue;
+
     const sentences = items.map((it) => it.sentence);
-    return {
+    out.push({
       id: row.id as string,
       name: row.name as string,
       createdAt: row.created_at as string,
       count: sentences.length,
       best: bestBySet.get(row.id as string) ?? null,
       hasChoice: sentences.some(hasChoices),
-    };
-  });
+      hiddenFor: childId ? [] : hiddenFor,
+    });
+  }
+  return out;
 }
 
 export interface SetDetail {

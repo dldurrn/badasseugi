@@ -111,6 +111,7 @@
 - `settings.test.ts` — 아이 것이 부모 기본값을 덮되 안 고른 것은 따라가는지, 회사 고르기 24개
 - `plan.test.ts` — 무료/유료 한도가 아직 아무도 막지 않는지 9개
 - `choices.test.ts` — 듣고 고르기의 후보 규칙·어절 자르기·왕복 41개
+- `visibility.test.ts` — 아이별 세트 숨김의 기본값·저장 요청 검사 26개
 
 ### 원고지 — `src/lib/wongoji.ts`, `src/components/Wongoji*.tsx`
 아이가 학교 공책처럼 **칸마다 한 글자씩** 씁니다(한 줄 15칸).
@@ -535,6 +536,26 @@ twin-ai.ts     Claude 호출. AI 가 닿는 유일한 자리     몇 원      �
 
 `buildSegments` 가 돌려준 조각을 **이어 붙이면 원래 문장이 됩니다.** 테스트가 내장 문제은행
 전 문장으로 이 왕복을 지킵니다 — 깨지면 아이가 다 골랐는데 문장이 원래와 달라집니다.
+
+### 아이별로 문제 세트 보이기 — `src/lib/visibility.ts`, `ParentSetList.tsx`, `/api/sets/visibility`
+
+직접 넣은 문제를 **아이마다 보이거나 숨깁니다.** 기본은 모두에게 보입니다.
+
+**숨긴 아이만 저장합니다**(`set_hidden`). 행이 없으면 모두에게 보입니다.
+「보이는 아이」를 저장하면 새 세트·새 아이마다 코드로 채워 줘야 하고, 하나라도 빠지면 세트가 사라진 것처럼 보입니다.
+숨겨도 점수·오답노트·리포트는 그대로이고, 다시 켜면 최고 점수도 돌아옵니다.
+
+**조작은 새 화면이 아니라 보호자 목록 위에서 합니다.** 「아이별로 보이기」를 누르면 같은 목록이
+체크 모드가 되고, 아이 탭을 바꾸며 체크를 끕니다. 바로 저장하고, 전체 선택·해제는 요청 한 번입니다.
+**아이가 한 명뿐이면 버튼을 안 그립니다.**
+
+`listSets(childId)` 가 아이 화면에서는 숨긴 세트를 **아예 빼고** 돌려줍니다.
+홈의 「오늘 할 것」(`getNextUp`)도 이 함수를 거치므로 따로 고칠 곳이 없습니다.
+숨김은 같은 질의에 얹어 왕복이 늘지 않고, 표가 아직 없으면(마이그레이션 전) 예전 칸으로 한 번 더 묻습니다.
+
+**직접 주소로 들어오는 것은 막지 않습니다.** 이건 정리용이지 정답 문장 보호(지침 9)가 아닙니다.
+저장 API 는 보호자 화면(`bs_view=parent`)에서만 받습니다 — 아이가 숨긴 것을 도로 켜지 못하게요.
+내장 문제(lv1~lv20)는 id 가 uuid 가 아니라 이번에는 대상이 아닙니다.
 
 ### 홈에서 바로 시작하기 — `getNextUp()`, `src/app/page.tsx`
 
@@ -988,7 +1009,7 @@ npx tsc --noEmit     # 타입 검사
 
 1. `.env.example`을 `.env.local`로 복사하고 값을 채웁니다
 2. Supabase 프로젝트를 만들고 `supabase/migrations/`의 파일을 **번호 순서대로 모두** 실행합니다
-   (`0001_init` → `0002_parent_pin` → `0003_tts_usage` → `0004_builtin_sets` → `0005_drop_spelling_bank` → `0006_settings` → `0007_engine` → `0008_twin` → `0009_wrong_events`).
+   (`0001_init` → `0002_parent_pin` → `0003_tts_usage` → `0004_builtin_sets` → `0005_drop_spelling_bank` → `0006_settings` → `0007_engine` → `0008_twin` → `0009_wrong_events` → `0010_set_hidden`).
    이미 돌아가고 있는 프로젝트라면 아직 안 돌린 번호만 실행하면 됩니다.
 3. Supabase 대시보드 > Authentication 설정
    - **URL Configuration > Redirect URLs**에 아래를 등록합니다. 여기에 없는 주소로는 되돌아오지 못합니다.

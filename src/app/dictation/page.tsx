@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { DictationSetCard } from '@/components/DictationSetCard';
 import { EmptyState } from '@/components/EmptyState';
+import { ParentSetList } from '@/components/ParentSetList';
 import { DICTATION_BANK } from '@/data/dictation-bank';
 import { hasChoices } from '@/lib/choices';
 import { builtinBestScores, listSets } from '@/lib/data';
-import { readActiveProfile } from '@/lib/profile-server';
+import { listChildren, readActiveProfile } from '@/lib/profile-server';
 
 export const metadata = { title: '받아쓰기 · 받아쓰기 공책' };
 
@@ -36,9 +37,11 @@ export default async function DictationPage() {
   const isChild = view === 'child';
   const childId = view === 'child' ? (child?.id ?? null) : null;
 
-  const [sets, builtinBest] = await Promise.all([
+  // 아이 목록은 보호자 화면의 「아이별로 보이기」에만 필요합니다. 나란히 불러 왕복을 늘리지 않습니다.
+  const [sets, builtinBest, kids] = await Promise.all([
     listSets(childId),
     builtinBestScores(childId),
+    isParent ? listChildren() : Promise.resolve([]),
   ]);
 
   return (
@@ -68,6 +71,17 @@ export default async function DictationPage() {
               </Link>
             ) : undefined
           }
+        />
+      ) : isParent ? (
+        <ParentSetList
+          kids={kids}
+          sets={sets.map((set) => ({
+            id: set.id,
+            name: set.name,
+            detail: `문장 ${set.count}개${set.best !== null ? ` · 최고 ${set.best}점` : ''}`,
+            hasChoice: set.hasChoice,
+            hiddenFor: set.hiddenFor,
+          }))}
         />
       ) : (
         <ul className="flex flex-col gap-3">
