@@ -8,9 +8,9 @@ import { PIN_LENGTH } from '@/lib/profile';
 /**
  * 보호자 잠금 만들기·바꾸기·없애기.
  *
- * 이 잠금이 막는 것은 리포트를 엿보는 게 아니라 **정답 문장 열람**입니다.
- * 보호자 화면에서는 세트를 열면 정답이 그대로 보이거든요.
+ * 보호자 화면은 아이 프로필·보이는 문제·기록을 바꾸는 **설정의 자리**라서 잠급니다.
  * 그 이유를 화면에 적어 둡니다. 이유를 모르면 부모가 그냥 꺼 버립니다.
+ * (정답 문장 열람을 막는 효과는 그대로입니다 — 화면 문구가 설정 쪽으로 옮겨 간 것뿐입니다.)
  */
 export function ParentLockSettings({ locked }: { locked: boolean }) {
   const router = useRouter();
@@ -127,8 +127,8 @@ export function ParentLockSettings({ locked }: { locked: boolean }) {
           </p>
           <p className="mt-0.5 text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
             {locked
-              ? '아이 화면에서 보호자 화면으로 넘어올 때 비밀번호를 물어요. 한 번 확인하면 30분 동안은 묻지 않아요.'
-              : '보호자 화면에서는 받아쓰기 정답 문장이 그대로 보여요. 잠그면 아이가 시험 전에 답을 보고 오는 것을 막을 수 있어요.'}
+              ? '보호자 화면으로 들어올 때 비밀번호를 물어요. 한 번 확인하면 30분 동안은 묻지 않아요. 잊었다면 여기서 새로 정할 수 있어요.'
+              : '보호자 화면에서는 아이 프로필, 보이는 문제, 기록을 바꿀 수 있어요. 잠가 두면 보호자만 바꿀 수 있어요.'}
           </p>
         </div>
         <div className="flex gap-2">

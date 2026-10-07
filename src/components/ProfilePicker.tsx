@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { PinPad } from '@/components/PinPad';
 import { EmptyState } from '@/components/EmptyState';
+import { LOCK_LATER_KEY, shouldAskToSetLock } from '@/lib/parent-lock';
 import { MAX_CHILDREN, PIN_LENGTH } from '@/lib/profile';
+import { toDateKeyInSeoul } from '@/lib/review';
 import { signOutAndGoToLogin } from '@/lib/sign-out';
 import type { ChildProfile } from '@/lib/types';
 
@@ -28,6 +30,10 @@ export function ProfilePicker({
 }) {
   const [locked, setLocked] = useState<ChildProfile | null>(null);
   const [askingParent, setAskingParent] = useState(false);
+  // 잠금이 없는 집이 처음 들어올 때 비밀번호를 정하는 단계. pin 이 첫 번, again 이 확인입니다.
+  const [settingUp, setSettingUp] = useState(false);
+  const [again, setAgain] = useState('');
+  const [forgetting, setForgetting] = useState(false);
   const [switchingAccount, setSwitchingAccount] = useState(false);
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +83,10 @@ export function ProfilePicker({
         | null;
       // 30분 유예가 끝났을 수 있으므로 잠금 응답이면 입력판을 띄웁니다.
       if (payload?.locked) setAskingParent(true);
-      setError(payload?.error ?? '보호자 화면으로 넘어가지 못했어요. 다시 눌러 주세요.');
+      // 401 은 「아직 번호를 안 눌렀다」일 뿐이라 처음 입력판에 빨간 글씨를 띄우지 않습니다.
+      if (response.status !== 401) {
+        setError(payload?.error ?? '보호자 화면으로 넘어가지 못했어요. 다시 눌러 주세요.');
+      }
       setPin('');
       setBusy(false);
       return;
@@ -85,12 +94,164 @@ export function ProfilePicker({
     window.location.replace('/');
   }, []);
 
+  /**
+   * 입구에서 비밀번호를 정하고 곧바로 들어갑니다. 설정까지 가는 걸음을 없애려고요.
+   * 두 번 누른 것이 다르면 확인 쪽만 비웁니다 — 처음부터 다시 누르게 하면 번거롭습니다.
+   */
+  const saveLock = useCallback(
+    async (first: string, second: string) => {
+      if (first !== second) {
+        setError('두 번 누른 비밀번호가 서로 달라요. 확인 번호를 다시 눌러 주세요.');
+        setAgain('');
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/profile/parent-pin', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: first }),
+        });
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+          setError(payload?.error ?? '저장하지 못했어요. 다시 눌러 주세요.');
+          setAgain('');
+          setBusy(false);
+          return;
+        }
+      } catch {
+        setError('연결이 끊겼어요. 잠시 후 다시 눌러 주세요.');
+        setAgain('');
+        setBusy(false);
+        return;
+      }
+      await goParent();
+    },
+    [goParent],
+  );
+
+  /** 「나중에 할게요」 — 오늘 하루만 미룹니다. 내일 들어오면 다시 묻습니다. */
+  const postponeLock = async () => {
+    try {
+      localStorage.setItem(LOCK_LATER_KEY, toDateKeyInSeoul());
+    } catch {
+      // 기기에 못 적어도 이번 한 번은 그냥 들어갑니다.
+    }
+    await goParent();
+  };
+
+  /**
+   * 보호자 버튼.
+   * 잠겨 있으면 **먼저 그냥 들어가 봅니다** — 30분 안에 한 번 확인했거나 방금 다시 로그인했으면
+   * 입력판 없이 통과하기 때문입니다. 안 되면 서버가 「잠겼다」고 알려 주고 그때 입력판이 뜹니다.
+   */
+  const openParent = () => {
+    if (parentLocked) {
+      goParent();
+      return;
+    }
+    let laterOn: string | null = null;
+    try {
+      laterOn = localStorage.getItem(LOCK_LATER_KEY);
+    } catch {
+      laterOn = null;
+    }
+    if (shouldAskToSetLock({ locked: false, laterOn, today: toDateKeyInSeoul() })) {
+      setSettingUp(true);
+      return;
+    }
+    goParent();
+  };
+
+  const forgotPin = async () => {
+    setBusy(true);
+    // 표시를 남기고 나갑니다. 다시 로그인하면 서버가 그 사실을 보고 한 번 통과시킵니다.
+    await fetch('/api/profile/lock-reset', { method: 'POST' }).catch(() => null);
+    await signOutAndGoToLogin();
+  };
+
   // 네 자리가 채워지면 따로 누르지 않아도 들어갑니다. 아이가 확인 버튼을 못 찾는 일을 줄입니다.
   useEffect(() => {
     if (busy || pin.length !== PIN_LENGTH) return;
     if (locked) enter(locked, pin);
     else if (askingParent) goParent(pin);
   }, [locked, askingParent, pin, busy, enter, goParent]);
+
+  useEffect(() => {
+    if (busy || !settingUp) return;
+    if (pin.length === PIN_LENGTH && again.length === PIN_LENGTH) saveLock(pin, again);
+  }, [settingUp, pin, again, busy, saveLock]);
+
+  if (settingUp) {
+    const firstDone = pin.length === PIN_LENGTH;
+    return (
+      <section className="rise-in">
+        <div className="mb-5 text-center">
+          <div className="mx-auto mb-2 text-[56px] leading-none" aria-hidden="true">
+            🔒
+          </div>
+          <p className="display text-lg font-bold">보호자 비밀번호 정하기</p>
+          <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+            보호자 화면에서는 아이 프로필, 보이는 문제, 기록을 바꿀 수 있어요.
+            <br />
+            보호자만 들어오도록 비밀번호를 정해 둘게요.
+          </p>
+          <p className="mt-2 text-sm font-semibold">
+            {firstDone ? '한 번 더 눌러서 확인해요' : '새 비밀번호 네 자리'}
+          </p>
+        </div>
+
+        {firstDone ? (
+          <PinPad
+            value={again}
+            onChange={setAgain}
+            disabled={busy}
+            hint={
+              error ? (
+                <span style={{ color: 'var(--pen-deep)' }}>{error}</span>
+              ) : (
+                <span style={{ color: 'var(--ink-faint)' }}>아이가 모르는 숫자로 정해 주세요</span>
+              )
+            }
+          />
+        ) : (
+          <PinPad
+            value={pin}
+            onChange={setPin}
+            disabled={busy}
+            hint={
+              <span style={{ color: 'var(--ink-faint)' }}>
+                잊어도 다시 로그인하면 새로 정할 수 있어요
+              </span>
+            }
+          />
+        )}
+
+        <div className="mt-5 flex justify-center gap-2">
+          {firstDone && (
+            <button
+              className="btn btn-quiet"
+              disabled={busy}
+              onClick={() => {
+                setPin('');
+                setAgain('');
+                setError(null);
+              }}
+            >
+              처음부터 다시
+            </button>
+          )}
+          <button className="btn btn-quiet" disabled={busy} onClick={postponeLock}>
+            나중에 할게요
+          </button>
+        </div>
+        <p className="mt-1 text-center text-xs" style={{ color: 'var(--ink-faint)' }}>
+          나중에 해도 내일 들어올 때 다시 물어봐요
+        </p>
+      </section>
+    );
+  }
 
   if (askingParent) {
     return (
@@ -101,7 +262,7 @@ export function ProfilePicker({
           </div>
           <p className="display text-lg font-bold">보호자 확인</p>
           <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
-            보호자 화면에는 정답 문장이 보여요.
+            보호자 화면에서는 설정을 바꿀 수 있어요.
             <br />
             비밀번호 네 자리를 눌러 주세요.
           </p>
@@ -124,12 +285,44 @@ export function ProfilePicker({
           className="btn btn-quiet mx-auto mt-5 block"
           onClick={() => {
             setAskingParent(false);
+            setForgetting(false);
             setPin('');
             setError(null);
           }}
         >
           그만두기
         </button>
+
+        {forgetting ? (
+          <div className="rise-in mt-3 text-center">
+            <p className="text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+              지금 계정에서 나갔다가 다시 로그인하면
+              <br />
+              새 비밀번호를 정할 수 있어요. 기록은 지워지지 않아요.
+            </p>
+            <div className="mt-3 flex justify-center gap-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setForgetting(false)}
+                disabled={busy}
+              >
+                그만두기
+              </button>
+              <button className="btn btn-primary" onClick={forgotPin} disabled={busy}>
+                다시 로그인하기
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="btn btn-quiet mx-auto mt-1 block text-sm"
+            style={{ color: 'var(--ink-soft)' }}
+            onClick={() => setForgetting(true)}
+            disabled={busy}
+          >
+            비밀번호를 잊었어요
+          </button>
+        )}
       </section>
     );
   }
@@ -244,7 +437,7 @@ export function ProfilePicker({
       <div className="mt-8 border-t pt-5 text-center" style={{ borderColor: 'var(--rule)' }}>
         <button
           className="btn btn-secondary"
-          onClick={() => (parentLocked ? setAskingParent(true) : goParent())}
+          onClick={openParent}
           disabled={busy}
         >
           {parentLocked && <span aria-hidden="true">🔒</span>}
