@@ -1062,4 +1062,53 @@
   .report-weeks__none {
     color: var(--ink-faint);
   }
+
+  /* ── 운영 현황(/admin) ──────────────────────────────────────── */
+  /* 주 8칸. 원고지 칸 모양 그대로 — 그 주에 쓴 날이 많을수록 초록이 진합니다. */
+  .admin-weeks {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    flex: 1;
+    max-width: 320px;
+    border: 1px solid var(--grid);
+  }
+  .admin-week {
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    border-left: 1px solid var(--grid-tint);
+    background: color-mix(in srgb, var(--grid) calc(var(--fill) * 100%), var(--card));
+    color: var(--ink);
+  }
+  .admin-week:first-child { border-left: 0; }
+  .admin-week:empty { background: var(--card); }
+  .admin-week:not(:empty) { color: #fff; font-weight: 700; }
+
+  .admin-status {
+    flex: none;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--rule-strong);
+    color: var(--ink-soft);
+    background: var(--card);
+  }
+  .admin-status[data-status="steady"] { background: var(--grid); border-color: var(--grid); color: #fff; }
+  .admin-status[data-status="sometimes"] { background: var(--grid-tint); border-color: var(--grid); color: var(--grid-deep); }
+  .admin-status[data-status="fading"],
+  .admin-status[data-status="gone"] { background: var(--pen-tint); border-color: var(--pen); color: var(--pen-deep); }
+
+  .admin-family summary { cursor: pointer; list-style: none; }
+  .admin-family summary::-webkit-details-marker { display: none; }
+  .admin-family[open] summary { background: var(--paper-sunk); }
+
+  .admin-days { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .admin-days th,
+  .admin-days td { padding: 3px 4px; text-align: right; border-bottom: 1px solid var(--rule); }
+  .admin-days th:first-child,
+  .admin-days td:first-child { text-align: left; }
+  .admin-days th { font-weight: 500; color: var(--ink-faint); }
 }
