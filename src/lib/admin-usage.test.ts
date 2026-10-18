@@ -117,6 +117,21 @@ describe('묶기', () => {
     expect(s.totals.retained14).toEqual({ kept: 1, eligible: 2 });
   });
 
+  it('출처별로 갈라 세고, 「모름」은 맨 아래', () => {
+    const s = buildUsage(
+      [
+        { ...family('a', '2026-09-01T00:00:00Z', '2026-10-16'), source: 'insta' },
+        { ...family('b', '2026-09-01T00:00:00Z', '2026-09-02'), source: 'insta' },
+        { ...family('c', '2026-09-01T00:00:00Z', '2026-10-16'), source: 'blog' },
+        family('d', '2026-09-01T00:00:00Z', null),
+      ],
+      [day('a', '2026-10-16'), day('c', '2026-10-13')],
+      NOW,
+    );
+    expect(s.sources.map((x) => x.source)).toEqual(['insta', 'blog', null]);
+    expect(s.sources[0]).toMatchObject({ families: 2, activeThisWeek: 1, retained14: { kept: 1, eligible: 2 } });
+  });
+
   it('잔존표: 가입 주별로, 아직 안 온 주는 비웁니다', () => {
     const s = buildUsage(
       [family('a', '2026-10-05T03:00:00Z', '2026-10-14'), family('b', '2026-10-06T03:00:00Z', '2026-10-06')],

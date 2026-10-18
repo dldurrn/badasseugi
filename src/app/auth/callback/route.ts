@@ -1,5 +1,7 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
+import { SOURCE_COOKIE, normalizeSource } from '@/lib/source';
 import { createClient } from '@/lib/supabase/server';
 
 /**
@@ -77,6 +79,18 @@ export async function GET(request: Request) {
     },
     { onConflict: 'id', ignoreDuplicates: true },
   );
+
+  /*
+    어디서 왔나 — 카카오로 가입한 집은 가입 요청에 출처를 실을 자리가 없어 여기서 적습니다.
+    **방금 만든 계정일 때만** 적습니다. 오래 쓰던 집이 어쩌다 인스타 링크로 들어와
+    다시 로그인했을 때 그 집을 인스타 출신으로 잘못 세지 않으려고요.
+    비어 있을 때만 적으므로 이메일 가입(트리거가 이미 적음)을 덮지 않습니다.
+  */
+  const source = normalizeSource((await cookies()).get(SOURCE_COOKIE)?.value);
+  const isNew = Date.now() - new Date(user.created_at).getTime() < 10 * 60 * 1000;
+  if (source && isNew) {
+    await supabase.from('families').update({ source }).eq('id', user.id).is('source', null);
+  }
 
   return NextResponse.redirect(new URL(next, url.origin));
 }

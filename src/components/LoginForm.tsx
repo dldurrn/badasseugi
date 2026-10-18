@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { authMessage, isAlreadyRegistered, isUnconfirmedEmail } from '@/lib/auth-messages';
 import { createClient } from '@/lib/supabase/client';
+import { readSourceCookie } from '@/lib/source';
 
 /**
  * 로그인·가입 — 보호자 계정으로만 만듭니다.
@@ -149,7 +150,12 @@ export function LoginForm({ callbackError }: { callbackError?: string }) {
         password,
         // 앱으로 들여보내지 않고 "가입이 끝났어요" 한 장만 보여 줍니다.
         // 메일은 대개 다른 기기에서 열기 때문에, 거기서 로그인까지 시키려 하면 실패합니다.
-        options: { emailRedirectTo: `${window.location.origin}/auth/confirmed` },
+        // 처음 온 곳(bs_src)을 실어 보내면 가입 트리거가 families.source 에 옮겨 적습니다.
+        // 메일 확인을 다른 기기에서 해도 출처는 이 기기 것으로 남습니다.
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirmed`,
+          data: { source: readSourceCookie(document.cookie) },
+        },
       });
       if (error) {
         // 이미 가입한 주소면 로그인 화면으로 옮겨 줍니다.

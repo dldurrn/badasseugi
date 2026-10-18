@@ -9,6 +9,7 @@ import {
   type UsageStatus,
 } from '@/lib/admin-usage';
 import { readActiveProfile } from '@/lib/profile-server';
+import { sourceLabel } from '@/lib/source';
 import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
@@ -134,6 +135,7 @@ export default async function AdminPage() {
                       <span style={{ color: 'var(--ink-faint)' }}>
                         {' '}
                         · {f.row.provider === 'kakao' ? '카카오' : '이메일'}
+                        {f.row.source && <> · {sourceLabel(f.row.source)}에서</>}
                       </span>
                     </span>
                     <span className="text-[11px] tabular-nums" style={{ color: 'var(--ink-faint)' }}>
@@ -209,6 +211,55 @@ export default async function AdminPage() {
       )}
       <p className="mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
         칸 하나가 한 주(월~일), 숫자는 그 주에 쓴 날 수예요. 맨 오른쪽이 이번 주. 줄을 누르면 날짜별로 펼쳐져요.
+      </p>
+
+      {/*
+        출처마다 「얼마나 오나」와 「와서 남나」를 나란히 둡니다.
+        많이 데려오는 곳과 오래 쓸 집을 데려오는 곳이 다를 수 있어서입니다.
+      */}
+      <h2 className="section-title mb-2">어디서 왔나</h2>
+      <div className="surface mb-2 overflow-x-auto">
+        <table className="report-weeks">
+          <thead>
+            <tr>
+              <th scope="col" className="report-weeks__name">
+                출처
+              </th>
+              <th scope="col">가입</th>
+              <th scope="col">이번 주 씀</th>
+              <th scope="col">2주 뒤에도 씀</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usage.sources.map((s) => (
+              <tr key={s.source ?? '-'}>
+                <th scope="row" className="report-weeks__name">
+                  {sourceLabel(s.source)}
+                </th>
+                <td>
+                  <b>{s.families}</b>
+                </td>
+                <td>{s.activeThisWeek || <span className="report-weeks__none">—</span>}</td>
+                <td>
+                  {s.retained14.eligible === 0 ? (
+                    <span className="report-weeks__none">—</span>
+                  ) : (
+                    <>
+                      <b>{Math.round((s.retained14.kept / s.retained14.eligible) * 100)}%</b>
+                      <span className="report-weeks__n">
+                        {s.retained14.kept}/{s.retained14.eligible}
+                      </span>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+        처음 들어온 곳 기준이에요. 링크에 <code>?from=insta</code> 처럼 꼬리표를 붙이면 정확해지고,
+        없으면 들어온 사이트·앱으로 짐작해요. 출처를 적기 전에 가입한 집은 「모름」이에요.
       </p>
 
       <h2 className="section-title mb-2">가입한 주마다, 몇 주 뒤에도 쓰나</h2>

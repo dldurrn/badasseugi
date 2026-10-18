@@ -112,7 +112,8 @@
 - `choices.test.ts` — 듣고 고르기의 후보 규칙·어절 자르기·왕복 41개
 - `visibility.test.ts` — 아이별 세트 숨김의 기본값·저장 요청 검사 26개
 - `parent-lock.test.ts` — 보호자 잠금을 기본으로 걸 때 묻는 때·잊었을 때 통과 조건 10개
-- `admin-usage.test.ts` — 운영 현황의 서울 날짜 경계·상태 판정·잔존 셈 12개
+- `admin-usage.test.ts` — 운영 현황의 서울 날짜 경계·상태 판정·잔존·출처별 셈 13개
+- `source.test.ts` — 출처 꼬리표 다듬기, referrer·앱 이름으로 짐작하는 차례 7개
 
 ### 원고지 — `src/lib/wongoji.ts`, `src/components/Wongoji*.tsx`
 아이가 학교 공책처럼 **칸마다 한 글자씩** 씁니다(한 줄 15칸).
@@ -868,6 +869,20 @@ lv3 과 lv12 를 같은 줄에서 견주는 것은 여전히 남은 문제입니
 | 뜸해짐 / 떠남 | 마지막으로 쓴 지 14일 / 30일 |
 | 가입만 | 7일이 지났는데 한 번도 안 씀 |
 
+#### 어디서 왔나 — `src/lib/source.ts`, `families.source`(0012)
+
+**링크에 붙인 꼬리표가 먼저입니다**(`?from=insta`, `?from=blog-3`). 영문 소문자·숫자·하이픈만 받습니다.
+referrer 는 인스타·카톡 앱 안 브라우저가 자주 지워, 꼬리표가 없을 때만 referrer → 앱 이름(UA) 순으로 짐작합니다.
+
+**처음 온 곳**을 셉니다. 프록시가 로그인 안 한 첫 방문에 쿠키(`bs_src`, 30일)를 얹고 덮어쓰지 않습니다.
+프록시에서 하는 이유는 첫 화면이 곧바로 `/login` 으로 튀어 거기서는 `?from=` 이 이미 사라지기 때문입니다 —
+그래서 **튕기는 응답에도** 쿠키를 얹습니다(`done()`).
+
+가입할 때 한 번 적습니다. 이메일은 가입 요청 metadata → 트리거(`handle_new_user`),
+카카오는 실을 자리가 없어 `/auth/callback` 에서 — **방금 만든 계정일 때만**(10분).
+오래 쓰던 집이 인스타 링크로 다시 로그인했다고 인스타 출신이 되면 안 됩니다.
+쿠키는 화면이 읽어야 해서 httpOnly 가 아닙니다. 개인정보가 아니라 꼬리표뿐입니다.
+
 ### 화면 구성 요약
 
 | 경로 | 누가 | 하는 일 |
@@ -1062,7 +1077,7 @@ npx tsc --noEmit     # 타입 검사
 
 1. `.env.example`을 `.env.local`로 복사하고 값을 채웁니다
 2. Supabase 프로젝트를 만들고 `supabase/migrations/`의 파일을 **번호 순서대로 모두** 실행합니다
-   (`0001_init` → `0002_parent_pin` → `0003_tts_usage` → `0004_builtin_sets` → `0005_drop_spelling_bank` → `0006_settings` → `0007_engine` → `0008_twin` → `0009_wrong_events` → `0010_set_hidden` → `0011_admin_usage`).
+   (`0001_init` → `0002_parent_pin` → `0003_tts_usage` → `0004_builtin_sets` → `0005_drop_spelling_bank` → `0006_settings` → `0007_engine` → `0008_twin` → `0009_wrong_events` → `0010_set_hidden` → `0011_admin_usage` → `0012_family_source`).
    이미 돌아가고 있는 프로젝트라면 아직 안 돌린 번호만 실행하면 됩니다.
 3. Supabase 대시보드 > Authentication 설정
    - **URL Configuration > Redirect URLs**에 아래를 등록합니다. 여기에 없는 주소로는 되돌아오지 못합니다.

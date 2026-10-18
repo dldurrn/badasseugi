@@ -19,6 +19,8 @@ export interface AdminFamilyRow {
   sets_count: number;
   sessions_total: number;
   last_active_on: string | null;
+  /** 어디서 왔나(0012). 그 전에 가입한 집과 마이그레이션 전에는 없습니다. */
+  source?: string | null;
 }
 
 /** `admin_activity(since)` 한 줄 — 집 하나의 하루 */
@@ -76,6 +78,14 @@ export interface Cohort {
   retained: (number | null)[];
 }
 
+/** 출처 한 갈래 — 얼마나 오고, 와서 남는가 */
+export interface SourceStat {
+  source: string | null;
+  families: number;
+  activeThisWeek: number;
+  retained14: { kept: number; eligible: number };
+}
+
 export interface UsageSummary {
   today: string;
   weekStarts: string[];
@@ -88,6 +98,8 @@ export interface UsageSummary {
   };
   families: FamilyUsage[];
   cohorts: Cohort[];
+  /** 많이 온 갈래부터. 「모름」은 맨 아래 */
+  sources: SourceStat[];
 }
 
 // --- 날짜 문자열 셈 ---------------------------------------------------------
@@ -185,14 +197,40 @@ export function buildUsage(
     new Set(activity.filter((a) => dayOf(a.day) >= from && dayOf(a.day) <= to).map((a) => a.family_id))
       .size;
 
-  let eligible = 0;
-  let kept = 0;
+  const activeThisWeekIds = new Set(
+    activity.filter((a) => dayOf(a.day) >= thisWeek && dayOf(a.day) <= today).map((a) => a.family_id),
+  );
+
+  /** 가입한 지 14일 지난 집 중 14일째 이후에도 쓴 집 */
+  const retained14 = (list: FamilyUsage[]) => {
+    let eligible = 0;
+    let kept = 0;
+    for (const f of list) {
+      if (diffDays(today, f.signupDay) < 14) continue;
+      eligible += 1;
+      const last = f.row.last_active_on ? dayOf(f.row.last_active_on) : null;
+      if (last && diffDays(last, f.signupDay) >= 14) kept += 1;
+    }
+    return { kept, eligible };
+  };
+
+  const bySource = new Map<string | null, FamilyUsage[]>();
   for (const f of usage) {
-    if (diffDays(today, f.signupDay) < 14) continue;
-    eligible += 1;
-    const last = f.row.last_active_on ? dayOf(f.row.last_active_on) : null;
-    if (last && diffDays(last, f.signupDay) >= 14) kept += 1;
+    const key = f.row.source ?? null;
+    const list = bySource.get(key);
+    if (list) list.push(f);
+    else bySource.set(key, [f]);
   }
+  const sources: SourceStat[] = [...bySource.entries()]
+    .map(([source, list]) => ({
+      source,
+      families: list.length,
+      activeThisWeek: list.filter((f) => activeThisWeekIds.has(f.row.family_id)).length,
+      retained14: retained14(list),
+    }))
+    .sort((a, b) =>
+      a.source === null ? 1 : b.source === null ? -1 : b.families - a.families,
+    );
 
   const cohorts: Cohort[] = weekStarts.map((week) => {
     const members = usage.filter((f) => seoulWeekStartOfKey(f.signupDay) === week);
@@ -213,12 +251,13 @@ export function buildUsage(
     weekStarts,
     totals: {
       families: families.length,
-      activeThisWeek: activeIn(thisWeek, today),
+      activeThisWeek: activeThisWeekIds.size,
       activeLastWeek: activeIn(addDays(thisWeek, -7), addDays(thisWeek, -1)),
-      retained14: { kept, eligible },
+      retained14: retained14(usage),
     },
     families: usage,
     cohorts: cohorts.reverse(),
+    sources,
   };
 }
 

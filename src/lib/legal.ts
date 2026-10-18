@@ -13,7 +13,7 @@ export const OPERATOR = '이영훈';
 export const CONTACT = 'lyhza@naver.com';
 
 /** 개인정보처리방침 시행일 */
-export const PRIVACY_DATE = '2026년 10월 17일';
+export const PRIVACY_DATE = '2026년 10월 18일';
 
 /** 이용약관 시행일 */
 export const TERMS_DATE = '2026년 8월 28일';

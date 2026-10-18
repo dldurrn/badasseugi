@@ -6,6 +6,7 @@ import {
   needsProfileSelection,
   parseView,
 } from '@/lib/profile';
+import { detectSource, SOURCE_COOKIE, SOURCE_COOKIE_MAX_AGE } from '@/lib/source';
 
 /**
  * 세션 쿠키를 갱신하고, 두 개의 문을 지킵니다.
@@ -64,24 +65,54 @@ export async function proxy(request: NextRequest) {
   // 각 라우트가 직접 401을 돌려주어야 fetch 쪽에서 원인을 알 수 있습니다.
   if (pathname.startsWith('/api')) return response;
 
+  /*
+    어디서 왔나(src/lib/source.ts) — **처음 온 순간**에만 적습니다.
+    여기서 하는 이유: 첫 화면이 대개 곧바로 /login 으로 튕겨서, 그 화면에서는
+    주소의 `?from=` 도 referrer 도 이미 사라진 뒤입니다. 그래서 튕기는 응답에도 쿠키를 얹습니다.
+    로그인한 사람에게는 안 적습니다 — 이미 가입했으니 셀 것이 없습니다.
+  */
+  const source =
+    user || request.cookies.has(SOURCE_COOKIE)
+      ? null
+      : detectSource({
+          param: request.nextUrl.searchParams.get('from'),
+          referrer: request.headers.get('referer'),
+          userAgent: request.headers.get('user-agent'),
+          ownHost: request.nextUrl.hostname,
+        });
+  const done = (res: NextResponse) => {
+    if (source) {
+      res.cookies.set(SOURCE_COOKIE, source, {
+        path: '/',
+        maxAge: SOURCE_COOKIE_MAX_AGE,
+        sameSite: 'lax',
+        // 이메일 가입은 화면에서 가입 요청에 실어 보내므로 화면이 읽을 수 있어야 합니다.
+        // 개인정보가 아니라 「인스타」 같은 꼬리표뿐입니다.
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+      });
+    }
+    return res;
+  };
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (!user) {
-    if (isPublic) return response;
+    if (isPublic) return done(response);
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = '';
-    return NextResponse.redirect(url);
+    return done(NextResponse.redirect(url));
   }
 
   if (pathname === '/login') {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     url.search = '';
-    return NextResponse.redirect(url);
+    return done(NextResponse.redirect(url));
   }
 
-  if (isPublic) return response;
+  if (isPublic) return done(response);
 
   const needsProfile = needsProfileSelection({
     view: parseView(request.cookies.get(VIEW_COOKIE)?.value),
@@ -93,10 +124,10 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/children';
     url.search = '';
-    return NextResponse.redirect(url);
+    return done(NextResponse.redirect(url));
   }
 
-  return response;
+  return done(response);
 }
 
 export const config = {
