@@ -10,6 +10,7 @@ import {
   type ItemOutcome,
   formatSeoulDate,
   toDateKeyInSeoul,
+  streakAfter,
 } from './review';
 
 const wrong = (refId: string, errorTypes: string[] = ['batchim']): ItemOutcome => ({
@@ -346,5 +347,26 @@ describe('화면 날짜 — 어디서 그리든 한국 기준', () => {
     */
     expect(toDateKeyInSeoul(new Date('2026-08-31T23:10:00Z'))).toBe('2026-09-01');
     expect(toDateKeyInSeoul(new Date('2026-08-31T14:30:00Z'))).toBe('2026-08-31');
+  });
+});
+
+describe('streakAfter — 닫기 전에 카드 윗줄의 별을 맞춥니다', () => {
+  it('맞혀서 별을 받으면 하나 늘어납니다', () => {
+    expect(streakAfter(0, { correct: true, starsEarned: 1, graduated: 0 })).toBe(1);
+  });
+  it('졸업하면 별 두 개입니다', () => {
+    expect(streakAfter(1, { correct: true, starsEarned: 1, graduated: 1 })).toBe(2);
+  });
+  it('틀리면 처음으로 돌아갑니다', () => {
+    expect(streakAfter(1, { correct: false, starsEarned: 0, graduated: 0 })).toBe(0);
+  });
+  it('이미 별이 없는데 틀려도 0입니다', () => {
+    expect(streakAfter(0, { correct: false, starsEarned: 0, graduated: 0 })).toBe(0);
+  });
+  it('별을 못 받은 정답(이미 졸업 등)은 그대로입니다', () => {
+    expect(streakAfter(2, { correct: true, starsEarned: 0, graduated: 0 })).toBe(2);
+  });
+  it('별 두 개를 넘지 않습니다', () => {
+    expect(streakAfter(2, { correct: true, starsEarned: 1, graduated: 0 })).toBe(2);
   });
 });

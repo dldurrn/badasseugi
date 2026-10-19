@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { InlineNotePractice } from './InlineNotePractice';
 import type { Settings } from '@/lib/settings';
 import { NoteDeleteButton } from './NoteDeleteButton';
 import { Stars } from './Stars';
 import type { SpellingQuestion } from '@/data/spelling-bank';
+import { streakAfter } from '@/lib/review';
 import { stepOf } from '@/lib/twin';
 import type { Module } from '@/lib/types';
 
@@ -43,6 +44,22 @@ export function NoteItem({
 }) {
   const [open, setOpen] = useState(false);
 
+  /*
+    푸는 동안 카드 윗줄의 별.
+
+    서버는 제출하는 순간 별을 올리지만, 이 카드가 들고 있는 값은 목록을 새로 받아 와야 바뀝니다.
+    새로 받는 것은 **닫을 때**(졸업한 카드가 「졸업」으로 옮겨 가고 순서도 바뀌므로 풀던 도중에는 못 합니다)라
+    그 전까지는 방금 받은 별이 안 보였습니다. 그래서 서버가 알려 준 결과로 별만 먼저 바꿔 둡니다.
+    null 이면 목록이 준 값을 그대로 씁니다.
+  */
+  const [shown, setShown] = useState<number | null>(null);
+  const streak = shown ?? note.streak;
+
+  // 목록을 새로 받아 값이 바뀌면 그쪽이 맞는 값입니다. 내가 들고 있던 것을 내려놓습니다.
+  useEffect(() => {
+    setShown(null);
+  }, [note.streak, note.wrongCount]);
+
   // 맞춤법인데 문제은행에서 사라진 항목은 풀 수 없습니다.
   const canPractice = Boolean(childId) && (note.module === 'dictation' || Boolean(question));
 
@@ -71,7 +88,7 @@ export function NoteItem({
         >
           {hideAnswer ? '들려주는 문장을 받아쓰세요' : note.content}
         </span>
-        <Stars streak={note.streak} />
+        <Stars streak={streak} />
       </div>
 
       <div className="mt-2 flex items-center gap-2">
@@ -106,6 +123,7 @@ export function NoteItem({
           */
           startStep={stepOf({ streak: note.streak, twinRef: note.twinRef })}
           settings={settings}
+          onSaved={(result) => setShown((cur) => streakAfter(cur ?? note.streak, result))}
           onClose={() => setOpen(false)}
         />
       )}

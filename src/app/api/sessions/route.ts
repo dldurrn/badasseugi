@@ -163,6 +163,8 @@ export async function POST(request: Request) {
   // 이번 세션에서 다룬 문제만 다시 씁니다.
   const touched = new Set(clean.map((o) => o.refId));
   const changed = applied.notes.filter((n) => touched.has(n.refId));
+  // 저장에 실패하면 화면이 「별을 받았어요」라고 말하지 않게 아래에서 알립니다.
+  let notesSaved = true;
 
   if (changed.length > 0) {
     const { error: noteError } = await supabase.from('wrong_notes').upsert(
@@ -182,7 +184,10 @@ export async function POST(request: Request) {
       })),
       { onConflict: 'child_id,module,ref_id' },
     );
-    if (noteError) console.error('[sessions] 오답노트 갱신 실패', noteError);
+    if (noteError) {
+      console.error('[sessions] 오답노트 갱신 실패', noteError);
+      notesSaved = false;
+    }
 
     /*
       짝 문제를 **미리** 만들어 둡니다.
@@ -195,9 +200,12 @@ export async function POST(request: Request) {
       이것 때문에 세션 저장이 늦어지거나 실패하면 안 됩니다.
       맞춤법은 문제은행에서 고르는 것이라 원가도 0원이고 거의 즉시 끝납니다.
     */
-    void fillTwins(supabase, childId, applied.notes).catch((e) =>
-      console.error('[sessions] 짝 만들기 실패', e),
-    );
+    // 저장이 안 된 노트에 짝만 붙이면 앞뒤가 어긋나므로 성공했을 때만 만듭니다.
+    if (notesSaved) {
+      void fillTwins(supabase, childId, applied.notes).catch((e) =>
+        console.error('[sessions] 짝 만들기 실패', e),
+      );
+    }
   }
 
   /* 2-1) 오답 이력 — 틀린 사건을 한 줄씩 --------------------------------
@@ -245,9 +253,11 @@ export async function POST(request: Request) {
     correctCount,
     totalCount: clean.length,
     trophy,
-    starsEarned: applied.starsEarned,
-    graduated: applied.graduated,
-    added: applied.added,
+    // 저장하지 못한 별·졸업을 받았다고 알리지 않습니다.
+    starsEarned: notesSaved ? applied.starsEarned : 0,
+    graduated: notesSaved ? applied.graduated : 0,
+    added: notesSaved ? applied.added : 0,
+    notesSaved,
   };
 
   return NextResponse.json(response);

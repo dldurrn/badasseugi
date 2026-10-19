@@ -55,6 +55,12 @@ interface Props {
   /** 별을 하나 받아 둔 상태로 다시 열면 짝부터 시작합니다 */
   startStep?: TwinStep;
   onClose: () => void;
+  /**
+   * 저장이 끝난 직후 부릅니다. 카드 윗줄의 별을 **닫기를 기다리지 않고** 바꾸라는 신호입니다.
+   * 닫을 때 목록을 새로 받아 오면 졸업한 카드가 「졸업」으로 옮겨 가고 순서도 바뀌는데,
+   * 풀던 도중에 그러면 카드가 사라지므로 새로고침은 닫을 때 그대로 두고 별만 먼저 바꿉니다.
+   */
+  onSaved?: (result: { correct: boolean; starsEarned: number; graduated: number }) => void;
   /** 서버가 읽어 내려준 값 */
   settings: Settings;
 }
@@ -68,6 +74,7 @@ export function InlineNotePractice({
   twin,
   startStep,
   onClose,
+  onSaved,
   settings,
 }: Props) {
   const router = useRouter();
@@ -175,6 +182,25 @@ export function InlineNotePractice({
         logAttempt: false,
       });
 
+      /*
+        별을 저장하지 못했으면 「받았어요」라고 말하지 않습니다.
+        말해 놓고 다음에 열었을 때 별이 비어 있으면 아이는 속았다고 느낍니다.
+        풀이 기록(attempts)은 이 경로에서 남기지 않으므로 다시 풀어도 두 번 쌓이지 않습니다.
+      */
+      if (!saved.notesSaved) {
+        setError('별을 저장하지 못했어요. 잠시 뒤에 한 번 더 풀어 주세요.');
+        setNote(null);
+        setPhase('done');
+        return;
+      }
+
+      // 카드 윗줄의 별을 지금 바꿉니다. 닫아야만 바뀌면 방금 받은 별이 안 보입니다.
+      onSaved?.({
+        correct: isCorrect,
+        starsEarned: saved.starsEarned,
+        graduated: saved.graduated,
+      });
+
       // 안내 문구는 서버가 실제로 판정한 결과를 그대로 씁니다.
       // 화면에서 별 개수를 짐작하면 서버와 어긋날 수 있습니다.
       if (saved.graduated > 0) setNote('별 두 개를 다 모았어요! 졸업이에요.');
@@ -190,7 +216,11 @@ export function InlineNotePractice({
       if (isCorrect && step === 'origin' && twin) setPhase('bridge');
       else setPhase('done');
     } catch (e) {
-      setError(e instanceof Error ? e.message : '저장하지 못했어요.');
+      // 보내지 못했으면 별은 저장되지 않았습니다. 「다음에 세어져요」라고 하면 사실과 다릅니다.
+      setError(
+        (e instanceof Error ? e.message : '저장하지 못했어요.') +
+          ' 별이 저장되지 않았어요. 잠시 뒤에 한 번 더 풀어 주세요.',
+      );
       setPhase('done');
     } finally {
       setBusy(false);
@@ -321,7 +351,7 @@ export function InlineNotePractice({
             className="mt-3 rounded-sm px-3 py-2.5 text-center text-sm"
             style={{ background: 'var(--pen-tint)', color: 'var(--pen-deep)' }}
           >
-            {error} 별은 다음에 다시 세어져요.
+            {error}
           </p>
         )}
 

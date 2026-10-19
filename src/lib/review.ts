@@ -249,6 +249,20 @@ export function applySessionOutcomes(
   return { notes: next, starsEarned, graduated, added };
 }
 
+/**
+ * 서버가 알려 준 결과로 화면의 별을 미리 맞춥니다 — `applySessionOutcomes` 와 같은 셈입니다.
+ * 오답노트 목록을 새로 받아 오기 전에(닫을 때까지) 카드 윗줄이 낡은 값으로 남지 않게 하려는 것입니다.
+ * 졸업은 별 두 개, 틀리면 처음부터(절대 원칙 5).
+ */
+export function streakAfter(
+  base: number,
+  result: { correct: boolean; starsEarned: number; graduated: number },
+): number {
+  if (result.graduated > 0) return STARS_TO_GRADUATE;
+  if (result.starsEarned > 0) return Math.min(STARS_TO_GRADUATE, base + 1);
+  return result.correct ? base : 0;
+}
+
 /** 아직 졸업하지 않아 연습이 필요한 문제들. */
 export function activeNotes(notes: WrongNote[]): WrongNote[] {
   return notes.filter((n) => !isGraduated(n));

@@ -70,6 +70,13 @@ export interface CompleteSessionResponse {
   graduated: number;
   /** 오답노트에 새로 들어간 문제 수 */
   added: number;
+  /**
+   * 오답노트(별·졸업)를 실제로 저장했는가.
+   *
+   * false 면 별·졸업·추가 수는 모두 0으로 내려갑니다 — 저장하지 못한 별을 받았다고 말하지 않으려는 것입니다.
+   * 풀이 기록은 이미 남았을 수 있어 요청 전체를 오류로 돌려주지 않습니다. 화면이 다시 보내면 기록이 두 번 쌓입니다.
+   */
+  notesSaved: boolean;
 }
 
 export const MAX_OUTCOMES = 100;
