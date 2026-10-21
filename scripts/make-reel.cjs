@@ -3,7 +3,8 @@
     node scripts/make-reel.cjs            세 편 전부
     node scripts/make-reel.cjs --sample   첫 편의 「훅 + 3·2·1」만 (디자인·템포 확인용)
 
-  결과: insta/reel/<이름>.mp4 (1080×1920, 30fps, 효과음 포함)
+  결과: channels/instagram/릴스/<--out 값, 기본 _작업중>/<이름>.mp4 (1080×1920, 30fps, 효과음 포함)
+    node scripts/make-reel.cjs --out=9차-투표형   처럼 차수 폴더를 바로 지정할 수 있습니다
 
   팔로워가 0명인 계정에서 캐러셀은 갈 곳이 없습니다 — 인스타는 게시물을 먼저
   팔로워에게 보내는데 받을 사람이 없으니까요. 릴스만 처음부터 남에게 갑니다.
@@ -142,7 +143,22 @@ const FORMATS = {
   },
 };
 
-const fmt = (reel) => ({ ...FORMATS.quiz, ...(FORMATS[reel.format] || {}) });
+/*
+  `vote: true` 는 형식이 아니라 **덧입히는 장치**입니다(quiz·dad 어느 쪽에도 붙습니다).
+  보기에 1·2 번호를 달고 「댓글에 번호로」를 세 군데서 말합니다 — 5차 인사이트에서
+  댓글이 0이었는데, 「정답을 댓글로」보다 「1 or 2」가 손이 덜 갑니다.
+  보기가 둘일 때만 됩니다(셋이면 카운트다운 원 아래에 문구 자리가 없습니다).
+*/
+const VOTE_HINT = '1번? 2번? 댓글에 남겨 보세요';
+const fmt = (reel) => {
+  const f = { ...FORMATS.quiz, ...(FORMATS[reel.format] || {}) };
+  return reel.vote ? { ...f, hint: VOTE_HINT } : f;
+};
+
+/** 투표형일 때 카운트다운·정답 장면 아래에 한 줄. 보기 상자 아래(≈946)와 원(≈1067) 사이 빈 줄입니다 — 원 아래는 꼬리표(1396)와 붙어 비좁습니다. */
+function voteLine(text, a = 1, y = 1022) {
+  return fadeG(a, fit(text, y, 40, { font: SANS, weight: 700, color: GRID_DEEP }));
+}
 
 function frame(inner, reel) {
   const tail = reel && fmt(reel).tail;
@@ -217,7 +233,7 @@ function questionLine(q, y, size, { filled = false } = {}) {
  * @param state  상자마다 'neutral' | 'right' | 'wrong'
  * @param strike 틀린 보기에 줄이 그어진 정도 0~1 — 한 번에 나타나면 그어진 게 아니라 원래 있던 게 됩니다
  */
-function options(q, { state = () => 'neutral', appear = () => 1, strike = 0 } = {}) {
+function options(q, { state = () => 'neutral', appear = () => 1, strike = 0, numbered = false } = {}) {
   const bw = W - PAD * 2;
   const { optY: y, h: boxH, gap } = layout(q.options.length);
   return q.options
@@ -237,6 +253,14 @@ function options(q, { state = () => 'neutral', appear = () => 1, strike = 0 } = 
             fill="${fill}" stroke="${stroke}" stroke-width="${right || wrong ? 5 : 3}"/>
       <text x="${W / 2}" y="${mid + fs * 0.36}" font-family="${SERIF}" font-size="${fs}" font-weight="700"
             fill="${right ? GRID_DEEP : wrong ? INK_SOFT : INK}" text-anchor="middle">${esc(op)}</text>`;
+
+      if (numbered) {
+        const bx = PAD + 72;
+        inner += `
+      <circle cx="${bx}" cy="${mid}" r="38" fill="${right ? GRID : GRID_TINT}" stroke="${GRID}" stroke-width="3"/>
+      <text x="${bx}" y="${mid + 20}" font-family="${SANS}" font-size="56" font-weight="700"
+            fill="${right ? '#ffffff' : GRID_DEEP}" text-anchor="middle">${i + 1}</text>`;
+      }
 
       if (wrong && strike > 0) {
         const lw = widthOf(op, fs) + 60;
@@ -263,14 +287,19 @@ function options(q, { state = () => 'neutral', appear = () => 1, strike = 0 } = 
 
 function sceneHook(q, reel, t) {
   const F = fmt(reel);
-  const a1 = at(t, 0.15, 0.4);
-  const a2 = at(t, 0.35, 0.4);
-  const aq = at(t, 0.95, 0.45);
-  const ah = at(t, 1.75, 0.4);
+  /*
+    5차 인사이트: 평균 3초 시청, 2~3초에 100%→25%. 예전에는 0초에 라벨뿐인 빈 화면이었고
+    문제는 0.95초에야 떴습니다. **문제부터 0초에 띄우고** 훅이 바로 뒤따릅니다 —
+    스크롤하던 눈이 처음 0.3초 안에 읽을 거리를 잡아야 합니다.
+  */
+  const a1 = at(t, 0.08, 0.3);
+  const a2 = at(t, 0.22, 0.3);
+  const aq = at(t, 0, 0.3);
+  const ah = at(t, 0.9, 0.35);
   return frame(`
-  ${rise(at(t, 0, 0.4), labelPill(F.label), 16)}
-  ${rise(a1, fit(reel.hook[0], HOOK_1, 62, { font: SANS, color: INK_SOFT }))}
-  ${rise(a2, fit(reel.hook[1], HOOK_2, 84, { font: SANS, weight: 700, color: PEN }))}
+  ${rise(at(t, 0, 0.25), labelPill(F.label), 16)}
+  ${rise(a1, fit(reel.hook[0], HOOK_1, 70, { font: SANS, color: INK_SOFT }))}
+  ${rise(a2, fit(reel.hook[1], HOOK_2, 94, { font: SANS, weight: 700, color: PEN }))}
   ${rise(
     aq,
     `<rect x="${PAD}" y="${HOOK_Q - 148}" width="${W - PAD * 2}" height="246" rx="30"
@@ -291,7 +320,8 @@ function sceneCount(q, reel, t) {
   return frame(`
   ${labelPill(F.label)}
   ${questionLine(q, CQ_Y, 50)}
-  ${options(q, { appear: (i) => at(t, i * 0.09, 0.32) })}
+  ${options(q, { appear: (i) => at(t, i * 0.09, 0.32), numbered: !!reel.vote })}
+  ${reel.vote ? voteLine('1번? 2번? 댓글에 번호로 남겨 보세요', at(t, 0.3, 0.3)) : ''}
   <circle cx="${W / 2}" cy="${cy}" r="${RING_R}" fill="${GRID_TINT}"/>
   <circle cx="${W / 2}" cy="${cy}" r="${RING_R}" fill="none" stroke="${GRID}" stroke-width="10"
           stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}"
@@ -329,7 +359,16 @@ function sceneAnswer(q, reel, t) {
     state: (op) =>
       op === q.answer ? (showRight ? 'right' : 'neutral') : showWrong ? 'wrong' : 'neutral',
     strike: showWrong ? strike : 0,
+    numbered: !!reel.vote,
   })}
+  ${
+    reel.vote
+      ? voteLine(
+          `${q.options.indexOf(q.answer) + 1}번이 정답! 맞혔다면 댓글에 숫자로 남겨 주세요`,
+          at(t, 0.9, 0.35),
+        )
+      : ''
+  }
   ${fadeG(1 - at(t, 0, 0.35), `<circle cx="${W / 2}" cy="${L.ringY}" r="${RING_R}" fill="${GRID_TINT}"/>`)}
   ${circleMark(W / 2, L.ringY, clamp01((t - 0.6) / 0.45))}`, reel);
 }
@@ -471,7 +510,7 @@ function sceneCta(q, reel, t) {
   두 줄을 읽고 문제까지 보기에 1.5초는 넘기라고 떠미는 시간이었습니다.
 */
 const TIMELINE = [
-  { name: 'hook', draw: sceneHook, dur: 2.6 },
+  { name: 'hook', draw: sceneHook, dur: 1.8 },
   { name: 'count', draw: sceneCount, dur: 3.0 },
   { name: 'answer', draw: sceneAnswer, dur: 3.8 },
   { name: 'why', draw: sceneWhy, dur: 3.4 },
@@ -485,7 +524,20 @@ const TIMELINE = [
 */
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice(7);
 const SAMPLE = ONLY.length > 0;
-const SCENES = SAMPLE ? TIMELINE.filter((s) => ONLY.split(',').includes(s.name)) : TIMELINE;
+
+/*
+  아웃트로 — 직접 만든 영상(2.9초, 1080×1920, 30fps)을 끝에 붙입니다.
+  있으면 그려 둔 `cta` 장면(같은 자리의 「프로필 링크」 안내)을 **대신해서** 쓰고,
+  `--no-outro` 를 주면 예전처럼 그려서 씁니다. 부분 뽑기(`--only`)에서는 붙이지 않습니다.
+  파일은 저장소의 channels/instagram/아웃트로/ 에 둡니다 — 영상은 git 에 안 들어가니
+  없으면 조용히 예전 CTA 장면으로 내려갑니다.
+*/
+const OUTRO_FILE = path.join(__dirname, '..', 'channels', 'instagram', '아웃트로', 'outro_badasseugi.mp4');
+const OUTRO =
+  !SAMPLE && !process.argv.includes('--no-outro') && fs.existsSync(OUTRO_FILE) ? OUTRO_FILE : null;
+const SCENES = SAMPLE
+  ? TIMELINE.filter((s) => ONLY.split(',').includes(s.name))
+  : TIMELINE.filter((s) => !(OUTRO && s.name === 'cta'));
 if (SCENES.length === 0) throw new Error('그런 장면이 없습니다: ' + ONLY);
 const DURATION = SCENES.reduce((a, s) => a + s.dur, 0);
 
@@ -541,44 +593,34 @@ const SFX = buildSfx();
 */
 const REELS = [
   /*
-    **이미 올린 편의 짝** 세 편입니다(짖어요 · 웬떡 · 같아요).
-    앞 편을 본 사람은 알아보고, 처음 보는 사람도 혼자 읽히게 잡았습니다.
-
-    이번만 quiz 2 : dad 1 입니다. 갔다/같다·지어요/짖어요는 **어른이 거의 안 틀려**
-    dad 로 내면 하단 「아빠는 3초 만에 틀렸습니다」가 거짓말이 됩니다.
-    시리즈 편은 새 사람을 데려오기보다 본 사람을 붙잡는 편이라 괜찮습니다.
-
-    앞 편 이야기는 캡션의 **점 세 줄 아래**에만 둡니다 —
-    위에 두면 규칙이 떠올라 답이 샙니다.
+    **8차 — 메뉴판 2탄, 투표형 3회차.** 1탄(곱빼기·찌개·떡볶이)이 이 계정에서 가장 잘 나온
+    소재(찌개 183·떡볶이 160)라 같은 결로 잇습니다. 정답 번호는 2·1·2 — 1편은 문제은행 순서 그대로,
+    3편은 `flip`으로 뒤집었습니다. 끝은 직접 만든 아웃트로(`channels/instagram/아웃트로/`).
   */
   {
-    file: '1_지어요',
-    id: 'jitda-1',
-    format: 'quiz',
-    // 짖어요 편의 훅(「받침 하나 때문에 / 강아지가 밥을 짓습니다」)을 뒤집은 문장입니다.
-    hook: ['지난번엔 강아지가 밥을 짓더니', '이번엔 엄마가 짖습니다'],
-    /*
-      짖어요 편과 **같은 모양의 상자에 초록만 반대쪽**입니다.
-      오른쪽(초록)이 이 문장의 답이라, 두 편을 이어 보면 한 쌍으로 읽힙니다.
-    */
-    bonus: { left: '짖다', leftLabel: '소리 내다', right: '짓다', rightLabel: '만들다' },
-  },
-  {
-    file: '2_왠지',
-    id: 'waen-1',
+    file: '1_깍두기',
+    id: 'food-3',
     format: 'dad',
-    // 웬떡 편에서 「왠지 말고는 다 웬」을 알려 줬으니, 그걸 가르친 아빠가 또 틀리는 이야기입니다.
-    hook: ['아이한테 규칙을 가르쳐 놓고', '제가 또 틀렸습니다'],
-    bonus: '「왠」은 「왠지」 하나뿐',
+    vote: true,
+    hook: ['깍두기 반찬 시킬 때', '제가 먼저 틀렸습니다'],
+    bonus: { wrong: '깍뚜기', right: '깍두기' },
   },
   {
-    file: '3_갔다',
-    id: 'batchim-3',
+    file: '2_육개장',
+    id: 'food-4',
+    format: 'dad',
+    vote: true,
+    hook: ['점심 메뉴 고르다가', '제가 또 틀렸습니다'],
+    bonus: { wrong: '육계장', right: '육개장' },
+  },
+  {
+    file: '3_뚝배기',
+    id: 'food-6',
     format: 'quiz',
-    // 부모를 겨눕니다. 「소리부터」가 왜 틀리는지(소리가 같음)를 짚되 답은 안 흘립니다.
-    hook: ['받아쓰기 틀렸다고 혼내기 전에', '소리부터 들어 보세요'],
-    // 둘 다 있는 말이라 뜻 라벨로. 같아요 편과 짝이고, 이번엔 오른쪽(초록)이 「갔다」입니다.
-    bonus: { left: '같다', leftLabel: '서로 비슷하다', right: '갔다', rightLabel: '다녀왔다' },
+    vote: true,
+    flip: true,
+    hook: ['된장국 담는 그릇', '아이들이 자주 틀립니다'],
+    bonus: { wrong: '뚝빼기', right: '뚝배기' },
   },
 ];
 
@@ -642,6 +684,26 @@ function encode(dir, out) {
   execFileSync(ffmpeg, args, { stdio: 'pipe' });
 }
 
+/** 본편 뒤에 아웃트로를 잇습니다. 소리 규격(44.1k 모노 / 48k 스테레오)이 달라 맞춰서 붙입니다. */
+function appendOutro(body, outro, out) {
+  const norm = 'fps=' + FPS + ',format=yuv420p,setsar=1';
+  const aud = 'aresample=48000,aformat=channel_layouts=stereo';
+  execFileSync(
+    ffmpeg,
+    [
+      '-y', '-i', body, '-i', outro,
+      '-filter_complex',
+      `[0:v]${norm}[v0];[1:v]${norm}[v1];[v0][v1]concat=n=2:v=1:a=0[v];` +
+        `[0:a]${aud}[a0];[1:a]${aud}[a1];[a0][a1]concat=n=2:v=0:a=1[a]`,
+      '-map', '[v]', '-map', '[a]',
+      '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+      '-c:a', 'aac', '-b:a', '128k',
+      out,
+    ],
+    { stdio: 'pipe' },
+  );
+}
+
 /*
   `--list` — 문제은행에 뭐가 있는지 봅니다.
   릴스로 만들 문항을 고르려면 문제은행 전체를 눈으로 훑어야 하는데,
@@ -665,7 +727,8 @@ function printBank(bank) {
   const bank = loadBank();
   if (LIST) return printBank(bank);
 
-  const outDir = path.join(__dirname, '..', 'insta', 'reel');
+  const OUT_NAME = (process.argv.find((a) => a.startsWith('--out=')) || '').slice(6) || '_작업중';
+  const outDir = path.join(__dirname, '..', 'channels', 'instagram', '릴스', OUT_NAME);
   fs.mkdirSync(outDir, { recursive: true });
 
   const chosen = PICK_N ? [REELS[PICK_N - 1]] : SAMPLE ? REELS.slice(0, 1) : REELS;
@@ -682,6 +745,11 @@ function printBank(bank) {
     if (q.kind === 'find') {
       throw new Error(`${reel.id} 는 find 형이라 릴스로 못 만듭니다. mcq·fill 문항을 고르세요.`);
     }
+    // 투표형에서 정답이 늘 1번이면 눈치챕니다. 문제은행 순서는 그대로 두고 이 편에서만 뒤집습니다.
+    if (reel.flip) q.options = [...q.options].reverse();
+    if (reel.vote && q.options.length !== 2) {
+      throw new Error(`${reel.id} 는 보기가 ${q.options.length}개라 투표형(vote)을 못 씁니다.`);
+    }
     const name = SAMPLE ? '_sample' : reel.file;
 
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'reel-'));
@@ -690,10 +758,16 @@ function printBank(bank) {
       const n = await render(q, reel, tmp);
       process.stdout.write(`${n}장 → 붙이는 중… `);
       const out = path.join(outDir, name + '.mp4');
-      encode(tmp, out);
+      if (OUTRO) {
+        const body = path.join(tmp, 'body.mp4');
+        encode(tmp, body);
+        appendOutro(body, OUTRO, out);
+      } else {
+        encode(tmp, out);
+      }
       if (!SAMPLE) {
         // 표지는 훅이 다 뜬 뒤로 잡습니다 — 0초는 아직 글이 켜지는 중입니다.
-        await sharp(Buffer.from(frameSvg(q, reel, Math.round(2.3 * FPS))))
+        await sharp(Buffer.from(frameSvg(q, reel, Math.round(1.5 * FPS))))
           .png()
           .toFile(path.join(outDir, reel.file + '_표지.png'));
       }
@@ -702,5 +776,5 @@ function printBank(bank) {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   }
-  console.log(`\n→ insta/reel/ · 각 ${DURATION.toFixed(1)}초`);
+  console.log(`\n→ channels/instagram/릴스/${OUT_NAME}/ · 각 ${(DURATION + (OUTRO ? 2.9 : 0)).toFixed(1)}초${OUTRO ? ' (아웃트로 포함)' : ''}`);
 })();

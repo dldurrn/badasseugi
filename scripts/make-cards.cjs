@@ -404,7 +404,7 @@ if (require.main !== module) return;
 
 (async () => {
   const bank = loadBank();
-  const dir = path.join(__dirname, '..', 'insta');
+  const dir = path.join(__dirname, '..', 'channels', 'instagram', '카드');
   fs.mkdirSync(dir, { recursive: true });
 
   for (const [i, id] of PICK.entries()) {
@@ -417,5 +417,5 @@ if (require.main !== module) return;
     }
     console.log(`${no}. ${q.tag}  (${id})  3장`);
   }
-  console.log('\n→ insta/ 폴더에 ' + PICK.length * 3 + '장');
+  console.log('\n→ channels/instagram/카드/ 폴더에 ' + PICK.length * 3 + '장');
 })();

@@ -1,7 +1,7 @@
 /*
   기능 소개 릴스를 만듭니다. `node scripts/make-feature-reel.cjs [--reel=N] [--sample] [--only=scene,...]`
 
-  결과: insta/feature-reel/<이름>.mp4 (1080×1920, 30fps, 효과음 포함)
+  결과: channels/instagram/기능소개/<이름>.mp4 (1080×1920, 30fps, 효과음 포함)
 
   make-reel.cjs 는 맞춤법 문제은행에서 퀴즈 형식을 뽑습니다.
   이건 다릅니다 — **문제은행 문항이 아니라 앱 화면 자체**(원고지·채점표·문제 넣기)를
@@ -434,7 +434,7 @@ function encode(dir, out) {
 }
 
 (async () => {
-  const outDir = path.join(__dirname, '..', 'insta', 'feature-reel');
+  const outDir = path.join(__dirname, '..', 'channels', 'instagram', '기능소개');
   fs.mkdirSync(outDir, { recursive: true });
   const name = SAMPLE || ONLY ? '_sample' : '1_채점표';
 
@@ -454,5 +454,5 @@ function encode(dir, out) {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-  console.log(`\n→ insta/feature-reel/ · ${DURATION.toFixed(1)}초`);
+  console.log(`\n→ channels/instagram/기능소개/ · ${DURATION.toFixed(1)}초`);
 })();

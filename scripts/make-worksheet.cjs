@@ -1,6 +1,6 @@
 /*
   촬영용 받아쓰기 문제지를 그립니다. `node scripts/make-worksheet.cjs`
-  결과: insta/worksheet/문제지_<N>급.png (A4 · 300dpi, 그대로 인쇄)
+  결과: channels/instagram/촬영용-문제지/문제지_<N>급.png (A4 · 300dpi, 그대로 인쇄)
 
   「사진으로 문제 넣기」 릴스를 찍으려면 사진 찍을 종이가 있어야 합니다.
   **실제 학교 문제지는 쓰지 않습니다** — 학교 이름·아이 이름·선생님 필체가 찍히고,
@@ -109,7 +109,7 @@ const SHEETS = [
 ];
 
 (async () => {
-  const dir = path.join(__dirname, '..', 'insta', 'worksheet');
+  const dir = path.join(__dirname, '..', 'channels', 'instagram', '촬영용-문제지');
   fs.mkdirSync(dir, { recursive: true });
   for (const { id, grade } of SHEETS) {
     const sentences = loadLevel(id).slice(0, 10);
