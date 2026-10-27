@@ -12,6 +12,8 @@ import { toDateKeyInSeoul } from './review';
 export const SET_NAME_MAX = 60;
 export const SENTENCE_MAX = 200;
 export const MAX_SENTENCES = 30;
+/** 급수표 한 장에서 한꺼번에 만드는 세트 수의 상한. 급수표는 대개 10~15급입니다. */
+export const MAX_BULK_SETS = 20;
 
 export function normalizeSetName(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;

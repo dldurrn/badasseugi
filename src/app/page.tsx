@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { CoachMarks } from '@/components/CoachMarks';
 import { DictationSetCard } from '@/components/DictationSetCard';
 import { InstallCard } from '@/components/InstallCard';
-import { getHomeSummary, getNextUp } from '@/lib/data';
+import { getHomeSummary, getNextUp, getReviewQueue } from '@/lib/data';
 import { readActiveProfile } from '@/lib/profile-server';
 
 /**
@@ -26,6 +26,8 @@ export default async function HomePage() {
     !isParent && child
       ? await Promise.all([getHomeSummary(child.id), getNextUp(child.id)])
       : [null, null];
+  // 확인 전 세트는 보호자 화면에서만 셉니다. 아이 화면에는 안 보이는 세트라 셀 까닭이 없습니다.
+  const reviewQueue = isParent ? await getReviewQueue(child?.id ?? null) : null;
   const today = summary?.today ?? null;
   const activeNotes = summary?.activeNotes ?? 0;
   const trophyCount = summary?.trophyCount ?? 0;
@@ -99,6 +101,34 @@ export default async function HomePage() {
 
       {isParent ? (
         <>
+          {/*
+            급수표에서 한꺼번에 만든 세트를 **급 순서대로 하나씩** 확인하게 합니다.
+            한자리에서 100문장을 보라고 하면 훑고 넘어가고, 잘못 읽힌 글자가 정답이 됩니다.
+            10문장이면 1분입니다. 확인을 미뤄 아이가 할 것이 없으면 문구를 바꿔 알립니다.
+          */}
+          {reviewQueue && (
+            <Link
+              href={`/dictation/${reviewQueue.next.id}/edit`}
+              className="surface mb-6 block p-4"
+              style={{ borderColor: 'var(--pen)', borderWidth: 2 }}
+            >
+              <span className="text-xs font-bold" style={{ color: 'var(--pen-deep)' }}>
+                {reviewQueue.idle
+                  ? `지금 ${child?.nickname ?? '아이'} 목록에 안 푼 문제가 없어요`
+                  : `확인할 세트가 ${reviewQueue.count}개 있어요`}
+              </span>
+              <span className="display mt-1 block text-base font-bold">
+                다음은 {reviewQueue.next.name}
+                <span className="ml-1.5 text-sm font-normal" style={{ color: 'var(--ink-soft)' }}>
+                  문장 {reviewQueue.next.count}개
+                </span>
+              </span>
+              <span className="mt-1 block text-xs" style={{ color: 'var(--ink-soft)' }}>
+                글자가 맞는지 확인하면 아이에게 열려요 →
+              </span>
+            </Link>
+          )}
+
           <h2 className="section-title mb-2">보호자</h2>
           <div className="surface p-5 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
             아이가 풀 문제를 넣어 두고, 리포트로 확인해요.

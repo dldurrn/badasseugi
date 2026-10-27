@@ -3,6 +3,20 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { prepareImageForUpload } from '@/lib/prepare-image';
+import {
+  EMPTY_REVIEW,
+  flaggedLines,
+  isBlurry,
+  partName,
+  readGroups,
+  readReview,
+  reviewAfterRemove,
+  reviewAfterSwap,
+  shiftReview,
+  splitScan,
+  type ScanPart,
+  type ScanReview,
+} from '@/lib/scan';
 import { MAX_SENTENCES, SENTENCE_MAX, SET_NAME_MAX } from '@/lib/sets';
 import { padToGrid, toCells, WONGOJI_COLS } from '@/lib/wongoji';
 import { readSetView, saveSetView, type SetView } from '@/lib/write-mode';
@@ -30,8 +44,9 @@ type ScanPhase = 'prepare' | 'upload' | 'read';
 
 interface OcrPayload {
   sentences?: string[];
-  corrections?: Correction[];
-  uncertain?: Uncertain[];
+  corrections?: unknown;
+  uncertain?: unknown;
+  groups?: unknown;
   error?: string;
 }
 
@@ -175,31 +190,112 @@ function ScanProgress({
   );
 }
 
-interface Correction {
-  index: number;
-  from: string;
-  to: string;
-  why: string;
-}
-
-interface Uncertain {
-  index: number;
-  why: string;
-}
-
-interface Review {
-  corrections: Correction[];
-  uncertain: Uncertain[];
-}
-
 interface SetFormProps {
   defaultName: string;
-  initial?: { id: string; name: string; sentences: string[] };
+  initial?: {
+    id: string;
+    name: string;
+    sentences: string[];
+    /** 급수표에서 한꺼번에 만든 확인 전 세트. 저장이 곧 「확인했어요」입니다 */
+    needsReview?: boolean;
+    reviewNotes?: ScanReview;
+  };
+}
+
+/**
+ * 사진에 급이 여럿 찍혔을 때 고르는 상자.
+ *
+ * **한 급만 넣는 쪽이 기본입니다.** 한꺼번에 만들기는 그 아래 따로 두고,
+ * 누르기 **전에** 무엇을 잃고(정확도) 무엇을 해야 하는지(차례로 확인)를 적어 둡니다.
+ * 늘 떠 있는 경고는 두세 번째부터 안 읽히므로, 여러 급이 잡힌 이때만 띄웁니다.
+ */
+function PartPicker({
+  parts,
+  canMakeAll,
+  busy,
+  onPick,
+  onMakeAll,
+  onCancel,
+}: {
+  parts: ScanPart[];
+  canMakeAll: boolean;
+  busy: boolean;
+  onPick: (part: ScanPart) => void;
+  onMakeAll: () => void;
+  onCancel: () => void;
+}) {
+  const total = parts.reduce((n, p) => n + p.sentences.length, 0);
+  return (
+    <div
+      className="rise-in mb-3 rounded p-4"
+      style={{ background: 'var(--grid-tint)', border: '2px solid var(--grid)' }}
+      role="status"
+    >
+      <p className="display text-base font-bold" style={{ color: 'var(--grid-deep)', margin: 0 }}>
+        사진에서 {parts.length}묶음, {total}문장을 찾았어요
+      </p>
+      <p className="mt-1 text-sm" style={{ color: 'var(--grid-deep)', margin: '6px 0 0' }}>
+        넣을 것을 눌러 주세요.
+      </p>
+      <ul className="mt-3 flex list-none flex-col gap-2 p-0">
+        {parts.map((part, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              className="surface flex w-full items-baseline gap-2 p-3 text-left"
+              onClick={() => onPick(part)}
+              disabled={busy}
+            >
+              <span className="display shrink-0 font-bold">{part.label || '제목 없음'}</span>
+              <span className="shrink-0 text-xs tabular-nums" style={{ color: 'var(--ink-soft)' }}>
+                {part.sentences.length}문장
+              </span>
+              <span
+                className="min-w-0 flex-1 truncate text-xs"
+                style={{ color: 'var(--ink-faint)' }}
+              >
+                {/* 제목이 안 찍힌 묶음은 대개 앞 급의 끝자락입니다. 첫 문장을 보면 알아봅니다 */}
+                {part.label ? part.sentences[0] : `위쪽에 걸린 문장 · ${part.sentences[0]}`}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {canMakeAll && (
+        <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--rule)' }}>
+          <button
+            type="button"
+            className="btn btn-secondary w-full justify-center"
+            onClick={onMakeAll}
+            disabled={busy}
+          >
+            {busy ? '만드는 중…' : `전부 세트로 만들어 두기 (${parts.length}개)`}
+          </button>
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
+            한꺼번에 찍으면 글씨가 작아 <b>잘못 읽히기 쉬워요.</b> 만들어 둔 세트는 확인하기
+            전까지 아이에게 안 보이고, 급 순서대로 하나씩 확인해 달라고 홈에서 알려 드릴게요.
+          </p>
+        </div>
+      )}
+
+      <button
+        type="button"
+        className="btn btn-quiet mt-2 w-full justify-center text-sm"
+        onClick={onCancel}
+        disabled={busy}
+      >
+        넣지 않기
+      </button>
+    </div>
+  );
 }
 
 export function SetForm({ defaultName, initial }: SetFormProps) {
   const router = useRouter();
   const editing = Boolean(initial);
+  /** 확인 전 세트를 여는 중. 저장 버튼이 「확인했어요 · 아이에게 열기」가 됩니다 */
+  const checking = Boolean(initial?.needsReview);
 
   const [name, setName] = useState(initial?.name ?? defaultName);
   const [sentences, setSentences] = useState<string[]>(
@@ -220,7 +316,18 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
   /** 방금 사진에서 가져온 문장 수. 확인을 마치면 0으로 돌아갑니다. */
   const [justScanned, setJustScanned] = useState(0);
   /** AI가 고쳤거나 미심쩍어한 곳. 부모가 확인해야 할 자리입니다. */
-  const [review, setReview] = useState<Review>({ corrections: [], uncertain: [] });
+  const [review, setReview] = useState<ScanReview>(
+    checking && initial?.reviewNotes ? initial.reviewNotes : EMPTY_REVIEW,
+  );
+  /** 사진에 급이 여럿 찍혀 고르는 중 */
+  const [parts, setParts] = useState<ScanPart[] | null>(null);
+  /** 방금 넣은 사진이 흐린가 — 그러면 다시 찍기를 권합니다 */
+  const [blurry, setBlurry] = useState(false);
+  /** 「다시 찍기」로 되돌릴 자리. 방금 사진에서 넣은 것만 걷어 냅니다 */
+  const [beforeScan, setBeforeScan] = useState<{
+    sentences: string[];
+    review: ScanReview;
+  } | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // 앨범과 카메라는 입력칸을 따로 둬야 합니다. capture 속성이 달라서요.
   const albumRef = useRef<HTMLInputElement>(null);
@@ -233,8 +340,13 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
     setSentences((prev) => prev.map((s, i) => (i === index ? value : s)));
   };
 
+  /*
+    지우고 옮길 때 「확인할 곳」 번호도 같이 옮깁니다. 안 그러면 위쪽 군더더기 줄을 지우는 순간
+    「4번을 고쳤어요」가 다른 줄을 가리키고, 「되돌리기」가 **그 줄을 덮어씁니다.**
+  */
   const removeAt = (index: number) => {
     setSentences((prev) => (prev.length === 1 ? [''] : prev.filter((_, i) => i !== index)));
+    setReview((r) => reviewAfterRemove(r, index));
   };
 
   const move = (index: number, delta: number) => {
@@ -245,6 +357,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+    setReview((r) => reviewAfterSwap(r, index, target));
   };
 
   const append = (list: string[]) => {
@@ -314,19 +427,16 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         });
         return;
       }
-      // 붙이기 전의 길이를 알아야 AI가 준 자리 번호를 우리 목록 번호로 옮길 수 있습니다.
-      const offset = sentences.filter((s) => s.trim().length > 0).length;
-      append(payload.sentences);
-
-      // 사진 인식은 틀릴 수 있고, 여기 들어간 문장이 그대로 채점 기준이 됩니다.
-      // 부모가 확인하지 않고 저장하면 아이가 맞게 쓰고도 틀렸다는 채점을 받습니다.
-      // 그래서 이 안내만은 눈에 확 띄게 따로 띄웁니다.
       setNotice(null);
-      setJustScanned(payload.sentences.length);
-      setReview({
-        corrections: (payload.corrections ?? []).map((c) => ({ ...c, index: c.index + offset })),
-        uncertain: (payload.uncertain ?? []).map((u) => ({ ...u, index: u.index + offset })),
-      });
+      const found = payload.sentences;
+      const split = splitScan(
+        found,
+        readGroups(payload.groups, found.length),
+        readReview(payload, found.length),
+      );
+      // 급이 여럿 찍혔으면 아직 붙이지 않고 고르게 합니다.
+      if (split.length >= 2) setParts(split);
+      else addPart(split[0]);
     } catch {
       setNotice({ kind: 'error', text: '사진을 보내지 못했어요. 연결을 확인해 주세요.' });
     } finally {
@@ -337,13 +447,89 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
     }
   };
 
+  /** 사진에서 읽은 묶음 하나를 목록 뒤에 붙입니다. */
+  const addPart = (part: ScanPart) => {
+    setParts(null);
+    setBeforeScan({ sentences, review });
+    // 붙이기 전의 길이를 알아야 AI가 준 자리 번호를 우리 목록 번호로 옮길 수 있습니다.
+    const offset = sentences.filter((s) => s.trim().length > 0).length;
+    append(part.sentences);
+    // 이름을 아직 안 고쳤으면 찍힌 급 이름을 그대로 씁니다. 「3급」을 또 칠 까닭이 없습니다.
+    if (!editing && part.label && name === defaultName) setName(part.label);
+
+    // 사진 인식은 틀릴 수 있고, 여기 들어간 문장이 그대로 채점 기준이 됩니다.
+    // 부모가 확인하지 않고 저장하면 아이가 맞게 쓰고도 틀렸다는 채점을 받습니다.
+    // 그래서 이 안내만은 눈에 확 띄게 따로 띄웁니다.
+    setJustScanned(part.sentences.length);
+    setBlurry(isBlurry(part.review, part.sentences.length));
+    const shifted = shiftReview(part.review, offset);
+    setReview((r) => ({
+      corrections: [...r.corrections, ...shifted.corrections],
+      uncertain: [...r.uncertain, ...shifted.uncertain],
+    }));
+  };
+
+  /** 흐린 사진에서 넣은 것을 걷어 내고 카메라를 다시 엽니다. */
+  const retake = () => {
+    if (beforeScan) {
+      setSentences(beforeScan.sentences.length ? beforeScan.sentences : ['']);
+      setReview(beforeScan.review);
+    }
+    setJustScanned(0);
+    setBlurry(false);
+    setBeforeScan(null);
+    cameraRef.current?.click();
+  };
+
+  /**
+   * 급마다 세트를 만들어 두고(확인 전) 홈으로 갑니다.
+   * 홈에 「다음은 ○급」 확인 카드가 떠 있어, 만든 직후 할 일이 바로 보입니다.
+   */
+  const makeAll = async () => {
+    if (!parts) return;
+    setBusy(true);
+    setNotice(null);
+    const base = name.trim() || defaultName;
+    try {
+      const response = await fetch('/api/sets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sets: parts.map((part, i) => ({
+            name: partName(part, i, base),
+            sentences: part.sentences,
+            review: part.review,
+          })),
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        setNotice({ kind: 'error', text: payload?.error ?? '세트를 만들지 못했어요.' });
+        setBusy(false);
+        return;
+      }
+    } catch {
+      setNotice({ kind: 'error', text: '보내지 못했어요. 연결을 확인해 주세요.' });
+      setBusy(false);
+      return;
+    }
+    router.replace('/');
+    router.refresh();
+  };
+
+  const flagged = flaggedLines(review);
+
   const save = async () => {
     setBusy(true);
     setNotice(null);
     const response = await fetch(editing ? `/api/sets/${initial!.id}` : '/api/sets', {
       method: editing ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.trim(), sentences: filled }),
+      body: JSON.stringify({
+        name: name.trim(),
+        sentences: filled,
+        ...(checking ? { reviewed: true } : {}),
+      }),
     });
 
     if (!response.ok) {
@@ -382,6 +568,17 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         쓰는 시점에 붙입니다.
       */}
       <CoachMarks tour="new-set" />
+
+      {checking && (
+        <div
+          className="mb-5 rounded p-4 text-sm leading-relaxed"
+          style={{ background: 'var(--pen-tint)', color: 'var(--pen-deep)' }}
+          role="status"
+        >
+          <b>아직 확인 전이라 아이에게 안 보여요.</b> 사진에서 한꺼번에 읽은 문장이에요.
+          글자가 맞는지 보고 아래 「확인했어요」를 누르면 아이 목록에 열려요.
+        </div>
+      )}
 
       <label className="section-title mb-2 block" htmlFor="set-name">
         세트 이름
@@ -424,7 +621,26 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         </button>
       </div>
 
+      {/*
+        경고가 아니라 요령이라 늘 둡니다. 잘 찍게 해서 확인할 일 자체를 줄이는 것이 가장 쌉니다.
+        급수표를 통째로 찍으면 글씨가 작아지고, 위아래 다른 급이 같이 들어옵니다.
+      */}
+      <p className="-mt-1 mb-3 text-xs" style={{ color: 'var(--ink-faint)' }}>
+        급수표는 <b style={{ color: 'var(--ink-soft)' }}>넣을 급만 크게</b> 찍으면 더 정확해요.
+      </p>
+
       {phase && <ScanProgress phase={phase} percent={percent} elapsed={elapsed} />}
+
+      {parts && (
+        <PartPicker
+          parts={parts}
+          canMakeAll={!editing}
+          busy={busy}
+          onPick={addPart}
+          onMakeAll={makeAll}
+          onCancel={() => setParts(null)}
+        />
+      )}
       <button
         type="button"
         className="btn btn-secondary mb-3 w-full justify-center"
@@ -472,7 +688,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
         </div>
       )}
 
-      {justScanned > 0 && (
+      {(justScanned > 0 || (checking && flagged.size > 0)) && (
         <div
           className="rise-in mb-3 rounded p-4"
           style={{
@@ -485,7 +701,9 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
             className="display text-base font-bold"
             style={{ color: 'var(--pen-deep)', margin: 0 }}
           >
-            사진에서 {justScanned}문장을 가져왔어요
+            {justScanned > 0
+              ? `사진에서 ${justScanned}문장을 가져왔어요`
+              : `먼저 볼 곳이 ${flagged.size}줄 있어요`}
           </p>
           <p
             className="mt-1.5 text-sm leading-relaxed"
@@ -495,6 +713,24 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
             여기 적힌 문장이 그대로 채점 기준이 되기 때문에,
             틀린 채로 두면 아이가 바르게 쓰고도 틀렸다고 나와요.
           </p>
+
+          {/*
+            흐린 줄이 많으면 하나씩 고치는 것보다 다시 찍는 편이 빠릅니다.
+            방금 넣은 것만 걷어 내고 카메라를 엽니다 — 앞서 넣어 둔 문장은 그대로입니다.
+          */}
+          {blurry && justScanned > 0 && (
+            <div
+              className="mt-3 flex flex-wrap items-center gap-2 rounded-sm p-2.5 text-[13px]"
+              style={{ background: 'var(--card)', color: 'var(--pen-deep)' }}
+            >
+              <span className="flex-1">
+                <b>흐린 줄이 많아요.</b> 가까이 다시 찍는 편이 빨라요.
+              </span>
+              <button type="button" className="btn btn-secondary text-sm" onClick={retake}>
+                다시 찍기
+              </button>
+            </div>
+          )}
           {/* AI가 고친 곳 — 무엇을 어떻게 바꿨는지 드러내고 되돌릴 길을 줍니다. */}
           {review.corrections.length > 0 && (
             <div className="mt-3.5">
@@ -568,7 +804,8 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
             style={{ background: 'var(--pen)', color: '#fff' }}
             onClick={() => {
               setJustScanned(0);
-              setReview({ corrections: [], uncertain: [] });
+              setBlurry(false);
+              setReview(EMPTY_REVIEW);
             }}
           >
             확인했어요
@@ -603,7 +840,14 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
 
       {view === 'wongoji' && filled.length > 0 ? (
         <ul className="mb-3 flex flex-col gap-3" data-coach="sentences">
-          {filled.map((sentence, index) => {
+          {/*
+            빈 줄을 뺀 목록이라 번호가 `sentences` 와 다를 수 있습니다.
+            지울 때는 원래 자리(`at`)로 지워야 다른 줄이 사라지지 않습니다.
+          */}
+          {sentences
+            .map((s, at) => ({ sentence: s.trim(), at }))
+            .filter((row) => row.sentence.length > 0)
+            .map(({ sentence, at }, index) => {
             const cells = toCells(sentence);
             // 몇 줄이 되는지 부모가 만들면서 알아야 합니다.
             // 두 줄이 되면 아이 화면에서 확인 버튼이 아래로 밀립니다.
@@ -611,7 +855,13 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
             return (
               <li key={index}>
                 <div className="mb-1 flex items-baseline gap-1.5">
-                  <span className="text-xs tabular-nums" style={{ color: 'var(--ink-faint)' }}>
+                  <span
+                    className="text-xs tabular-nums"
+                    style={{
+                      color: flagged.has(at) ? 'var(--pen)' : 'var(--ink-faint)',
+                      fontWeight: flagged.has(at) ? 700 : 400,
+                    }}
+                  >
                     {index + 1}
                   </span>
                   <span className="flex-1 truncate text-xs" style={{ color: 'var(--ink-soft)' }}>
@@ -623,6 +873,19 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
                   >
                     {cells.length}칸{rows > 1 && ` · ${rows}줄`}
                   </span>
+                  {/*
+                    원고지 보기에도 지우기를 둡니다. 칸 수를 보며 넘치는 줄을 찾는 곳이
+                    바로 여기인데, 지우려면 「고치러 가기」로 한 번 더 넘어가야 했습니다.
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => removeAt(at)}
+                    aria-label={`${index + 1}번째 문장 지우기`}
+                    className="shrink-0 px-1.5 text-sm leading-none"
+                    style={{ color: 'var(--pen)' }}
+                  >
+                    ✕
+                  </button>
                 </div>
                 <WongojiSheet
                   cells={padToGrid(cells, 1)}
@@ -645,6 +908,8 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
             </span>
             <input
               className="field"
+              /* AI가 고쳤거나 흐리다고 한 줄은 테를 붉게 — 순서는 문제지와 같아야 해서 옮기지 않습니다 */
+              style={flagged.has(index) ? { borderColor: 'var(--pen)', borderWidth: 2 } : undefined}
               /* 열 칸이 모두 같은 placeholder라, 낭독기로는 몇 번째인지 알 수 없었습니다 */
               aria-label={`${index + 1}번째 문장`}
               value={sentence}
@@ -720,7 +985,7 @@ export function SetForm({ defaultName, initial }: SetFormProps) {
       )}
 
       <button type="submit" className="btn btn-primary btn-lg" disabled={!canSave}>
-        {editing ? '저장하기' : '세트 만들기'}
+        {checking ? '확인했어요 · 아이에게 열기' : editing ? '저장하기' : '세트 만들기'}
       </button>
 
       {editing && (

@@ -78,9 +78,12 @@ export default async function DictationPage() {
           sets={sets.map((set) => ({
             id: set.id,
             name: set.name,
-            detail: `문장 ${set.count}개${set.best !== null ? ` · 최고 ${set.best}점` : ''}`,
+            detail: set.needsReview
+              ? `문장 ${set.count}개 · 확인 전이라 아이에게 안 보여요`
+              : `문장 ${set.count}개${set.best !== null ? ` · 최고 ${set.best}점` : ''}`,
             hasChoice: set.hasChoice,
             hiddenFor: set.hiddenFor,
+            needsReview: set.needsReview,
           }))}
         />
       ) : (

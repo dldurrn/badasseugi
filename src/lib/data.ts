@@ -1,6 +1,7 @@
 import { DICTATION_BANK, findBuiltinSet, isBuiltinSetId } from '@/data/dictation-bank';
 import { hasChoices } from '@/lib/choices';
 import { isHiddenFor } from '@/lib/visibility';
+import { EMPTY_REVIEW, readReview, reviewOrder, type ScanReview } from '@/lib/scan';
 import { createClient } from '@/lib/supabase/server';
 import { seoulWeekStart, toDateKeyInSeoul, type WrongNote } from '@/lib/review';
 import { buildTracks, daysIntoWeek, type Track } from '@/lib/report';
@@ -39,6 +40,11 @@ export interface SetSummary {
    * 보호자 화면에서만 의미가 있습니다 — 체크 모드가 이것을 그립니다.
    */
   hiddenFor: string[];
+  /**
+   * 확인 전인가(급수표에서 한꺼번에 만든 것). 아이 화면에서는 아예 돌려주지 않으므로
+   * 늘 false 입니다 — 홈의 「오늘 할 것」에도 안 뜹니다.
+   */
+  needsReview: boolean;
 }
 
 /**
@@ -63,8 +69,18 @@ export async function listSets(childId: string | null): Promise<SetSummary[]> {
   */
   let { data: sets, error } = await supabase
     .from('sets')
-    .select('id, name, created_at, set_items(sentence), set_hidden(child_id)')
+    .select('id, name, created_at, needs_review, set_items(sentence), set_hidden(child_id)')
     .order('created_at', { ascending: false });
+
+  if (error) {
+    // 0013 전: 확인 전 칸이 없습니다. 그 칸만 빼고 다시 묻습니다.
+    const retry = await supabase
+      .from('sets')
+      .select('id, name, created_at, set_items(sentence), set_hidden(child_id)')
+      .order('created_at', { ascending: false });
+    sets = retry.data as typeof sets;
+    error = retry.error;
+  }
 
   if (error) {
     /*
@@ -107,6 +123,12 @@ export async function listSets(childId: string | null): Promise<SetSummary[]> {
       )
     );
     if (isHiddenFor(hiddenFor, childId)) continue;
+    /*
+      확인 전 세트는 아이에게 안 보입니다. 잘못 읽힌 글자가 그대로 정답이라,
+      열어 두면 아이가 바르게 쓰고도 틀렸다는 채점을 받습니다.
+    */
+    const needsReview = (row as { needs_review?: boolean | null }).needs_review === true;
+    if (childId && needsReview) continue;
 
     const sentences = items.map((it) => it.sentence);
     out.push({
@@ -117,6 +139,7 @@ export async function listSets(childId: string | null): Promise<SetSummary[]> {
       best: bestBySet.get(row.id as string) ?? null,
       hasChoice: sentences.some(hasChoices),
       hiddenFor: childId ? [] : hiddenFor,
+      needsReview,
     });
   }
   return out;
@@ -128,6 +151,10 @@ export interface SetDetail {
   sentences: string[];
   /** 앱이 미리 갖고 있는 기본 문제인지. 이건 부모가 고칠 수 없습니다. */
   builtin: boolean;
+  /** 확인 전인가. 고치기 화면이 「확인했어요 · 아이에게 열기」로 바뀝니다 */
+  needsReview: boolean;
+  /** 확인할 곳 — AI가 고쳤거나 흐리다고 한 줄 */
+  reviewNotes: ScanReview;
 }
 
 export async function getSet(id: string): Promise<SetDetail | null> {
@@ -135,13 +162,29 @@ export async function getSet(id: string): Promise<SetDetail | null> {
   if (isBuiltinSetId(id)) {
     const found = findBuiltinSet(id);
     return found
-      ? { id: found.id, name: found.name, sentences: found.sentences, builtin: true }
+      ? {
+          id: found.id,
+          name: found.name,
+          sentences: found.sentences,
+          builtin: true,
+          needsReview: false,
+          reviewNotes: EMPTY_REVIEW,
+        }
       : null;
   }
 
   const supabase = await createClient();
 
-  const { data: set } = await supabase.from('sets').select('id, name').eq('id', id).maybeSingle();
+  let { data: set, error } = await supabase
+    .from('sets')
+    .select('id, name, needs_review, review_notes')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) {
+    // 0013 전: 칸이 없으면 예전 칸만으로 다시 묻습니다.
+    const retry = await supabase.from('sets').select('id, name').eq('id', id).maybeSingle();
+    set = retry.data as typeof set;
+  }
   if (!set) return null;
 
   const { data: items } = await supabase
@@ -155,6 +198,49 @@ export async function getSet(id: string): Promise<SetDetail | null> {
     name: set.name as string,
     sentences: (items ?? []).map((i) => i.sentence as string),
     builtin: false,
+    needsReview: set.needs_review === true,
+    reviewNotes: readReview(set.review_notes, items?.length ?? 0),
+  };
+}
+
+/**
+ * 보호자 홈의 「확인할 차례」.
+ *
+ * 급수표에서 한꺼번에 만든 세트를 **급 순서대로 하나씩** 확인하게 합니다.
+ * 날짜를 따로 받지 않습니다 — 급수표는 1급부터 차례로 시험을 보니 급 번호가 곧 차례입니다.
+ *
+ * `idle` 은 「아이가 지금 할 세트가 없다」입니다. 확인을 미루면 아이 목록이 비므로
+ * 그때는 문구를 세게 바꿉니다. 확인 전 세트가 **있을 때만** 셉니다 —
+ * 대부분의 집은 비어 있어 보호자 홈이 왕복 한 번으로 끝납니다.
+ */
+export interface ReviewQueue {
+  count: number;
+  next: { id: string; name: string; count: number };
+  idle: boolean;
+}
+
+export async function getReviewQueue(childId: string | null): Promise<ReviewQueue | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('sets')
+    .select('id, name, created_at, set_items(count)')
+    .eq('needs_review', true);
+  // 0013 전에는 칸이 없어 실패합니다. 확인할 것이 없는 것과 같습니다.
+  if (error || !data || data.length === 0) return null;
+
+  const queue = reviewOrder(
+    data.map((row) => ({
+      id: row.id as string,
+      name: row.name as string,
+      createdAt: row.created_at as string,
+      count: ((row.set_items as unknown as Array<{ count: number }> | null)?.[0]?.count ?? 0),
+    })),
+  );
+  const open = childId ? await listSets(childId) : [];
+  return {
+    count: queue.length,
+    next: { id: queue[0].id, name: queue[0].name, count: queue[0].count },
+    idle: childId !== null && !open.some((s) => s.best === null),
   };
 }
 

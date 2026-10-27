@@ -11,6 +11,8 @@ interface ParentSet {
   detail: string;
   hasChoice: boolean;
   hiddenFor: string[];
+  /** 확인 전이면 상세가 아니라 곧장 고치기(확인) 화면으로 보냅니다 — 할 일이 그것뿐이라서요 */
+  needsReview?: boolean;
 }
 
 /**
@@ -163,7 +165,7 @@ export function ParentSetList({
             return (
               <li key={set.id}>
                 <DictationSetCard
-                  href={`/dictation/${set.id}`}
+                  href={set.needsReview ? `/dictation/${set.id}/edit` : `/dictation/${set.id}`}
                   name={set.name}
                   detail={note ? `${set.detail} · ${note}` : set.detail}
                   isChild={false}

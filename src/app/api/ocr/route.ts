@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUser } from '@/lib/api';
 import { limitsFor, planOf } from '@/lib/plan';
 import { toDateKeyInSeoul } from '@/lib/review';
+import { EMPTY_REVIEW, readGroups, readReview, type ScanGroup, type ScanReview } from '@/lib/scan';
 
 /**
  * 문제지 사진에서 받아쓰기 문장을 추출합니다.
@@ -20,6 +21,12 @@ import { toDateKeyInSeoul } from '@/lib/review';
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 /**
+ * 급수표 한 장을 통째로 찍으면 100문장 가까이 돌려줍니다. 그만큼 오래 걸려 넉넉히 둡니다.
+ * (기본값에 걸리면 다 읽어 놓고 응답 직전에 잘립니다.)
+ */
+export const maxDuration = 60;
+
+/**
  * Anthropic이 받는 형식만 둡니다. HEIC는 거부합니다 —
  * 넣어 두면 아이폰 사진이 통과했다가 Anthropic 단계에서 실패해
  * "밝은 곳에서 다시 찍으라"는 엉뚱한 안내를 보게 됩니다.
@@ -33,6 +40,11 @@ const EXTRACTION_PROMPT = `이 사진은 한국 초등학교 받아쓰기 문제
 2. 마침표, 물음표, 느낌표, 쉼표는 사진에 있는 그대로 유지합니다.
 3. 띄어쓰기도 사진에 보이는 그대로 유지합니다.
 4. 글자가 전혀 읽히지 않는 문장은 제외합니다.
+5. 문제지에 「1급」「2급」「3단계」처럼 묶음 제목이 있으면 제목은 문장에 넣지 말고 groups 에 남기세요.
+   start 는 그 묶음 첫 문장의 sentences 자리(0부터)입니다.
+   사진 맨 위에 제목 없이 걸린 문장(앞 묶음의 끝자락)도 빼지 말고 sentences 에 그대로 두세요.
+   그 문장들은 어느 묶음에도 넣지 않습니다 — 첫 묶음의 start 가 0보다 크면 됩니다.
+   묶음 제목이 보이지 않으면 groups 는 [] 로 두세요.
 
 받침은 작아서 잘못 읽기 쉽습니다. 특히 ㄴ/ㄷ, ㄹ/ㄼ, ㅅ/ㅆ, ㅈ/ㅊ 을 주의해서 보세요.
 읽은 결과가 실제 한국어 낱말인지 확인하세요.
@@ -49,66 +61,13 @@ to 는 sentences 의 그 자리에 들어간 값과 정확히 같아야 합니�
 {
   "sentences": ["아기","우리","ㄷ, 디귿"],
   "corrections": [{ "index": 2, "from": "ㄷ, 디근", "to": "ㄷ, 디귿", "why": "자모 이름은 '디귿'입니다" }],
-  "uncertain": [{ "index": 0, "why": "글자가 흐려서 확실하지 않습니다" }]
+  "uncertain": [{ "index": 0, "why": "글자가 흐려서 확실하지 않습니다" }],
+  "groups": [{ "label": "3급", "start": 0 }]
 }
 위 예에서 sentences 의 2번 자리가 "ㄷ, 디근"이 아니라 고친 값 "ㄷ, 디귿"인 것에 주의하세요.
 index 는 sentences 배열에서의 자리(0부터)입니다.
 고친 것이 없으면 corrections 는 [] 로, 미심쩍은 것이 없으면 uncertain 은 [] 로 두세요.
 문장을 하나도 찾지 못하면 sentences 를 [] 로 두세요.`;
-
-/** AI가 고쳐 적은 곳. 부모가 되돌릴 수 있도록 원래 읽은 값도 함께 보냅니다. */
-export interface OcrCorrection {
-  index: number;
-  from: string;
-  to: string;
-  why: string;
-}
-
-/** AI가 확신하지 못한 곳. 고치지는 않았지만 부모가 봐야 합니다. */
-export interface OcrUncertain {
-  index: number;
-  why: string;
-}
-
-/** 짧게 자르고 자리 번호가 실제 문장 범위 안인지 확인합니다. */
-function clip(value: unknown, max: number): string {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '';
-}
-
-function readCorrections(raw: unknown, count: number): OcrCorrection[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      const c = item as Record<string, unknown>;
-      return {
-        index: Number(c?.index),
-        from: clip(c?.from, 200),
-        to: clip(c?.to, 200),
-        why: clip(c?.why, 120),
-      };
-    })
-    .filter(
-      (c) =>
-        Number.isInteger(c.index) &&
-        c.index >= 0 &&
-        c.index < count &&
-        c.to.length > 0 &&
-        // 바뀐 게 없으면 알릴 것도 없습니다.
-        c.from !== c.to,
-    )
-    .slice(0, 30);
-}
-
-function readUncertain(raw: unknown, count: number): OcrUncertain[] {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((item) => {
-      const u = item as Record<string, unknown>;
-      return { index: Number(u?.index), why: clip(u?.why, 120) };
-    })
-    .filter((u) => Number.isInteger(u.index) && u.index >= 0 && u.index < count)
-    .slice(0, 30);
-}
 
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -193,8 +152,8 @@ export async function POST(request: Request) {
 
   // Anthropic 호출
   let sentences: string[];
-  let corrections: OcrCorrection[] = [];
-  let uncertain: OcrUncertain[] = [];
+  let review: ScanReview = EMPTY_REVIEW;
+  let groups: ScanGroup[] = [];
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -205,7 +164,7 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 1500,
+        max_tokens: 6000,
         messages: [
           {
             role: 'user',
@@ -243,14 +202,46 @@ export async function POST(request: Request) {
       : ((parsed as { sentences?: unknown })?.sentences ?? null);
     if (!Array.isArray(rawSentences)) throw new Error('예상과 다른 형식');
 
-    sentences = rawSentences
-      .map((s) => String(s).replace(/\s+/g, ' ').trim())
-      .filter((s) => s.length > 0 && s.length <= 200);
+    /*
+      빈 줄·너무 긴 줄을 버리면 뒤쪽 자리 번호가 당겨집니다. AI가 준 번호는 버리기 **전** 기준이라
+      그대로 쓰면 「3번을 고쳤어요」가 엉뚱한 줄을 가리킵니다. 그래서 옛 번호 → 새 번호를 들고 다닙니다.
+    */
+    const cleaned = rawSentences.map((s) => String(s).replace(/\s+/g, ' ').trim());
+    const newIndex = new Map<number, number>();
+    const kept: string[] = [];
+    cleaned.forEach((s, i) => {
+      if (s.length === 0 || s.length > 200) return;
+      newIndex.set(i, kept.length);
+      kept.push(s);
+    });
+    sentences = kept;
+    /** 버려진 줄에서 시작하던 묶음은 그다음 남은 줄에서 시작합니다. */
+    const startAt = (old: number) => {
+      for (let i = old; i < cleaned.length; i++) {
+        const n = newIndex.get(i);
+        if (n !== undefined) return n;
+      }
+      return -1;
+    };
+    const remap = (list: unknown) =>
+      (Array.isArray(list) ? list : []).map((item) => ({
+        ...(item as object),
+        index: newIndex.get(Number((item as { index?: unknown })?.index)) ?? -1,
+      }));
 
     if (!Array.isArray(parsed)) {
-      const obj = parsed as { corrections?: unknown; uncertain?: unknown };
-      corrections = readCorrections(obj.corrections, sentences.length);
-      uncertain = readUncertain(obj.uncertain, sentences.length);
+      const obj = parsed as { corrections?: unknown; uncertain?: unknown; groups?: unknown };
+      review = readReview(
+        { corrections: remap(obj.corrections), uncertain: remap(obj.uncertain) },
+        sentences.length,
+      );
+      groups = readGroups(
+        (Array.isArray(obj.groups) ? obj.groups : []).map((g) => ({
+          ...(g as object),
+          start: startAt(Number((g as { start?: unknown })?.start)),
+        })),
+        sentences.length,
+      );
     }
   } catch (error) {
     console.error('[ocr] 인식 실패', error);
@@ -268,5 +259,5 @@ export async function POST(request: Request) {
       { onConflict: 'family_id,used_on' },
     );
 
-  return NextResponse.json({ sentences, corrections, uncertain });
+  return NextResponse.json({ sentences, ...review, groups });
 }

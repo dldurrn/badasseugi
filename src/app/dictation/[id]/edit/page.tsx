@@ -20,7 +20,9 @@ export default async function EditSetPage({ params }: { params: Promise<{ id: st
         <Link href={`/dictation/${set.id}`} className="text-sm" style={{ color: 'var(--ink-soft)' }}>
           ← {set.name}
         </Link>
-        <h1 className="display mt-3 text-2xl font-bold">문제 세트 고치기</h1>
+        <h1 className="display mt-3 text-2xl font-bold">
+          {set.needsReview ? '문제 세트 확인하기' : '문제 세트 고치기'}
+        </h1>
       </header>
 
       {view === 'parent' ? (

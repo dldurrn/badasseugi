@@ -18,7 +18,9 @@ export async function PATCH(request: Request, { params }: Params) {
   const { supabase } = auth;
   const { id } = await params;
 
-  const body = await readJson<{ name?: unknown; sentences?: unknown }>(request);
+  const body = await readJson<{ name?: unknown; sentences?: unknown; reviewed?: unknown }>(
+    request,
+  );
   if (!body) return badRequest('입력을 읽지 못했어요.');
 
   const name = normalizeSetName(body.name);
@@ -27,9 +29,14 @@ export async function PATCH(request: Request, { params }: Params) {
   const sentences = normalizeSentences(body.sentences);
   if (sentences.length === 0) return badRequest('문장을 한 개 이상 넣어 주세요.');
 
+  /*
+    확인 전 세트를 저장하면 그것이 곧 「확인했어요」입니다 — 아이에게 열립니다.
+    확인 전 세트에서만 이 값이 옵니다. 늘 보내면 마이그레이션 0013 전에는 칸이 없어
+    평범한 고치기까지 실패합니다.
+  */
   const { data: set, error } = await supabase
     .from('sets')
-    .update({ name })
+    .update(body.reviewed === true ? { name, needs_review: false, review_notes: null } : { name })
     .eq('id', id)
     .select('id')
     .maybeSingle();
