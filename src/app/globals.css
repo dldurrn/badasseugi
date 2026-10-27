@@ -1101,6 +1101,20 @@
   .admin-status[data-status="fading"],
   .admin-status[data-status="gone"] { background: var(--pen-tint); border-color: var(--pen); color: var(--pen-deep); }
 
+  /* 핵심 사용자는 상태 옆에 붙습니다. 금색은 보상 전용이라 안 씁니다 — 진한 먹으로. */
+  .admin-status[data-status="core"] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+  .admin-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .admin-chips__label { font-size: 11px; color: var(--ink-faint); margin-right: 2px; }
+  .admin-chip {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--rule); background: var(--card); color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .admin-chip[aria-current="true"] { background: var(--grid); border-color: var(--grid); color: #fff; font-weight: 600; }
+
+  .admin-limits { font-size: 11px; color: var(--pen-deep); }
+
   .admin-family summary { cursor: pointer; list-style: none; }
   .admin-family summary::-webkit-details-marker { display: none; }
   .admin-family[open] summary { background: var(--paper-sunk); }

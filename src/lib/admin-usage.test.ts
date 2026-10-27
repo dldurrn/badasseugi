@@ -3,7 +3,14 @@ import {
   activitySince,
   addDays,
   buildUsage,
+  CORE_DAYS_28,
+  CORE_SESSIONS_28,
   diffDays,
+  filterFamilies,
+  limitHits,
+  parseFilter,
+  parseSort,
+  sortFamilies,
   statusOf,
   WEEKS,
   type AdminActivityRow,
@@ -27,7 +34,7 @@ function family(id: string, signedUp: string, lastActive: string | null): AdminF
   };
 }
 
-function day(id: string, d: string, sessions = 1): AdminActivityRow {
+function day(id: string, d: string, sessions = 1, ocr = 0): AdminActivityRow {
   return {
     family_id: id,
     day: d,
@@ -36,7 +43,7 @@ function day(id: string, d: string, sessions = 1): AdminActivityRow {
     dictation: sessions,
     spelling: 0,
     tts_chars: 50,
-    ocr: 0,
+    ocr,
   };
 }
 
@@ -150,5 +157,108 @@ describe('묶기', () => {
     const s = buildUsage([family('a', '2026-10-11T16:00:00Z', null)], [], NOW);
     expect(s.cohorts.find((c) => c.week === '2026-10-12')!.signups).toBe(1);
     expect(s.cohorts.find((c) => c.week === '2026-10-05')!.signups).toBe(0);
+  });
+});
+
+describe('핵심 사용자와 한도', () => {
+  /** 10-17 에서 거슬러 n 일을 연달아 */
+  const days = (id: string, n: number, sessions = 1) =>
+    Array.from({ length: n }, (_, i) => day(id, addDays('2026-10-17', -i), sessions));
+
+  it('28일 중 8일, 세션 10회를 둘 다 넘어야 핵심 사용자', () => {
+    const fams = ['a', 'b', 'c'].map((id) => family(id, '2026-09-01T00:00:00Z', '2026-10-17'));
+    const s = buildUsage(
+      fams,
+      [
+        ...days('a', CORE_DAYS_28, 2), // 8일 · 16회
+        ...days('b', CORE_DAYS_28 - 1, 3), // 7일 · 21회
+        ...days('c', CORE_DAYS_28, 1), // 8일 · 8회
+      ],
+      NOW,
+    );
+    const core = Object.fromEntries(s.families.map((f) => [f.row.family_id, f.core]));
+    expect(core).toEqual({ a: true, b: false, c: false });
+    expect(CORE_SESSIONS_28).toBe(10);
+    expect(s.totals.core).toBe(1);
+  });
+
+  it('무료 한도를 넘긴 날·아이 수·사진을 셉니다 — 28일 밖은 안 셉니다', () => {
+    const h = limitHits({
+      children: 2,
+      last28: [
+        { sessions: 3, ocr: 0 },
+        { sessions: 2, ocr: 0 },
+        { sessions: 5, ocr: 1 },
+      ],
+    });
+    expect(h).toEqual({ sessionDays: 2, children: true, photo: true });
+    expect(limitHits({ children: 1, last28: [{ sessions: 2, ocr: 0 }] })).toEqual({
+      sessionDays: 0,
+      children: false,
+      photo: false,
+    });
+
+    const s = buildUsage(
+      [family('a', '2026-08-01T00:00:00Z', '2026-10-16')],
+      [day('a', '2026-09-01', 9, 2), day('a', '2026-10-16', 1)],
+      NOW,
+    );
+    expect(s.families[0].limits).toEqual({ sessionDays: 0, children: false, photo: false });
+    expect(s.totals.wouldHit.any).toBe(0);
+  });
+
+  it('요약은 갈래별로, 핵심 사용자 중 막힐 집도 따로', () => {
+    const s = buildUsage(
+      [
+        { ...family('a', '2026-09-01T00:00:00Z', '2026-10-17'), children_count: 2 },
+        family('b', '2026-09-01T00:00:00Z', '2026-10-17'),
+        family('c', '2026-09-01T00:00:00Z', '2026-10-17'),
+      ],
+      [...days('a', 8, 3), day('b', '2026-10-17', 1, 1), day('c', '2026-10-17')],
+      NOW,
+    );
+    expect(s.totals.wouldHit).toEqual({ any: 2, sessions: 1, children: 1, photo: 1, core: 1 });
+  });
+});
+
+describe('정렬·거르기', () => {
+  const s = buildUsage(
+    [
+      family('old', '2026-08-01T00:00:00Z', '2026-10-17'),
+      { ...family('kids', '2026-10-01T00:00:00Z', '2026-10-10'), children_count: 3 },
+      family('gone', '2026-07-01T00:00:00Z', '2026-09-01'),
+    ],
+    [
+      day('old', '2026-10-17'),
+      day('old', '2026-10-16'),
+      day('kids', '2026-10-10', 6),
+    ],
+    NOW,
+  );
+  const ids = (key: Parameters<typeof sortFamilies>[1]) =>
+    sortFamilies([...s.families], key).map((f) => f.row.family_id);
+
+  it('기준마다 순서가 바뀝니다', () => {
+    expect(ids('active')).toEqual(['old', 'kids', 'gone']);
+    expect(ids('sessions')).toEqual(['kids', 'old', 'gone']);
+    expect(ids('recent')).toEqual(['old', 'kids', 'gone']);
+    expect(ids('signup')).toEqual(['kids', 'old', 'gone']);
+    expect(ids('limits')[0]).toBe('kids');
+  });
+
+  it('거르기', () => {
+    const f = (key: Parameters<typeof filterFamilies>[1]) =>
+      filterFamilies(s.families, key).map((x) => x.row.family_id);
+    expect(f('limits')).toEqual(['kids']);
+    expect(f('fading')).toEqual(['gone']);
+    expect(f('all')).toHaveLength(3);
+  });
+
+  it('주소에 모르는 값이 오면 기본으로', () => {
+    expect(parseSort('limits')).toBe('limits');
+    expect(parseSort('toString')).toBe('active');
+    expect(parseSort(undefined)).toBe('active');
+    expect(parseFilter('core')).toBe('core');
+    expect(parseFilter('<x>')).toBe('all');
   });
 });

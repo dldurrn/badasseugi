@@ -1,13 +1,26 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   activitySince,
   buildUsage,
   COHORT_OFFSETS,
+  CORE_DAYS_28,
+  CORE_SESSIONS_28,
+  FILTER_LABEL,
+  filterFamilies,
+  parseFilter,
+  parseSort,
+  SORT_LABEL,
+  sortFamilies,
   STATUS_LABEL,
+  type FilterKey,
+  type LimitHits,
+  type SortKey,
   type AdminActivityRow,
   type AdminFamilyRow,
   type UsageStatus,
 } from '@/lib/admin-usage';
+import { LIMITS } from '@/lib/plan';
 import { readActiveProfile } from '@/lib/profile-server';
 import { sourceLabel } from '@/lib/source';
 import { createClient } from '@/lib/supabase/server';
@@ -29,7 +42,15 @@ export const metadata = {
  * 세 질의를 **나란히** 보냅니다. 운영자 확인을 먼저 하고 나머지를 부르면 도쿄 왕복이 하나 더 듭니다.
  * 운영자가 아니면 나머지 둘은 어차피 빈 결과라 먼저 보내도 새는 것이 없습니다.
  */
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sort?: string; filter?: string }>;
+}) {
+  const params = await searchParams;
+  const sort = parseSort(params.sort);
+  const filter = parseFilter(params.filter);
+
   const { view } = await readActiveProfile();
   if (view !== 'parent') notFound();
 
@@ -59,6 +80,19 @@ export default async function AdminPage() {
     (acts.data ?? []) as AdminActivityRow[],
   );
   const { totals } = usage;
+  const shown = filterFamilies(sortFamilies([...usage.families], sort), filter);
+  const free = LIMITS.free;
+
+  /** 정렬과 거르기는 서로를 지우지 않습니다 — 하나를 바꿔도 다른 하나는 남습니다. */
+  const hrefFor = (next: { sort?: SortKey; filter?: FilterKey }) => {
+    const q = new URLSearchParams();
+    const sk = next.sort ?? sort;
+    const fk = next.filter ?? filter;
+    if (sk !== 'active') q.set('sort', sk);
+    if (fk !== 'all') q.set('filter', fk);
+    const qs = q.toString();
+    return qs ? `/admin?${qs}` : '/admin';
+  };
 
   const statusCounts = usage.families.reduce<Partial<Record<UsageStatus, number>>>((acc, f) => {
     acc[f.status] = (acc[f.status] ?? 0) + 1;
@@ -107,6 +141,32 @@ export default async function AdminPage() {
         중간에 나간 세션과 듣고 고르기는 소리를 들은 날로만 잡혀요.
       </p>
 
+      {/*
+        유료화 기준을 정하는 재료. **실제로 막는 것이 아닙니다** — 요금제는 꺼져 있습니다.
+        「지금 한도를 켰다면 지난 28일에 누가 막혔나」를 대 볼 뿐입니다.
+      */}
+      <div className="surface mb-2 grid grid-cols-2">
+        <div className="px-3 py-4 text-center">
+          <div className="display text-xl font-bold tabular-nums">{totals.core}</div>
+          <div className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+            핵심 사용자
+          </div>
+        </div>
+        <div className="px-3 py-4 text-center">
+          <div className="display text-xl font-bold tabular-nums">{totals.wouldHit.any}</div>
+          <div className="mt-1 text-[11px]" style={{ color: 'var(--ink-faint)' }}>
+            무료 한도에 닿았을 집 (그중 핵심 {totals.wouldHit.core})
+          </div>
+        </div>
+      </div>
+      <p className="mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+        핵심 사용자는 최근 28일 중 {CORE_DAYS_28}일 이상 쓰고 세션을 {CORE_SESSIONS_28}회 이상 마친 집이에요.
+        한도는 <b>아직 켜지 않았어요</b> — 지금 무료 한도(하루 세션 {free.sessionsPerDay}회 · 아이{' '}
+        {free.children}명 · 사진 넣기 안 됨)를 지난 28일에 대 보면 세션 {totals.wouldHit.sessions}집 · 아이 수{' '}
+        {totals.wouldHit.children}집 · 사진 {totals.wouldHit.photo}집이 막혔을 거예요.
+        리포트 기간과 AI 짝 문제는 쓴 기록이 없어 셀 수 없어요.
+      </p>
+
       <div className="mb-4 flex flex-wrap gap-2">
         {STATUS_ORDER.filter((s) => statusCounts[s]).map((s) => (
           <span key={s} className="admin-status" data-status={s}>
@@ -115,14 +175,56 @@ export default async function AdminPage() {
         ))}
       </div>
 
-      <h2 className="section-title mb-2">집마다</h2>
-      {usage.families.length === 0 ? (
+      <h2 className="section-title mb-2">
+        집마다{' '}
+        <span className="text-[12px] font-normal" style={{ color: 'var(--ink-faint)' }}>
+          {shown.length}/{usage.families.length}
+        </span>
+      </h2>
+      <nav aria-label="정렬" className="admin-chips mb-1">
+        <span className="admin-chips__label">정렬</span>
+        {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+          <Link
+            key={k}
+            href={hrefFor({ sort: k })}
+            className="admin-chip"
+            aria-current={k === sort ? 'true' : undefined}
+            scroll={false}
+          >
+            {SORT_LABEL[k]}
+          </Link>
+        ))}
+      </nav>
+      <nav aria-label="거르기" className="admin-chips mb-3">
+        <span className="admin-chips__label">보기</span>
+        {(Object.keys(FILTER_LABEL) as FilterKey[]).map((k) => (
+          <Link
+            key={k}
+            href={hrefFor({ filter: k })}
+            className="admin-chip"
+            aria-current={k === filter ? 'true' : undefined}
+            scroll={false}
+          >
+            {FILTER_LABEL[k]}
+          </Link>
+        ))}
+      </nav>
+      {shown.length === 0 ? (
         <p className="surface mb-6 p-5 text-center text-sm" style={{ color: 'var(--ink-soft)' }}>
-          아직 가입한 집이 없어요. 링크를 나눈 뒤 다시 와 보세요.
+          {usage.families.length === 0 ? (
+            '아직 가입한 집이 없어요. 링크를 나눈 뒤 다시 와 보세요.'
+          ) : (
+            <>
+              「{FILTER_LABEL[filter]}」에 드는 집이 아직 없어요.{' '}
+              <Link href={hrefFor({ filter: 'all' })} className="underline">
+                전체 보기
+              </Link>
+            </>
+          )}
         </p>
       ) : (
         <ul className="surface mb-2 flex flex-col divide-y p-0" style={{ borderColor: 'var(--rule)' }}>
-          {usage.families.map((f) => (
+          {shown.map((f) => (
             <li key={f.row.family_id}>
               <details className="admin-family">
                 <summary className="flex flex-col gap-2 px-4 py-3">
@@ -130,6 +232,11 @@ export default async function AdminPage() {
                     <span className="admin-status" data-status={f.status}>
                       {STATUS_LABEL[f.status]}
                     </span>
+                    {f.core && (
+                      <span className="admin-status" data-status="core">
+                        핵심
+                      </span>
+                    )}
                     <span className="min-w-0 flex-1 truncate">
                       {f.row.email_masked ?? '(이메일 없음)'}
                       <span style={{ color: 'var(--ink-faint)' }}>
@@ -166,6 +273,11 @@ export default async function AdminPage() {
                       세션 {f.sessions28}회
                     </span>
                   </div>
+                  {limitText(f.limits, free.sessionsPerDay) && (
+                    <div className="admin-limits">
+                      한도에 닿음 · {limitText(f.limits, free.sessionsPerDay)}
+                    </div>
+                  )}
                 </summary>
                 <div className="px-4 pb-4 text-[12px]" style={{ color: 'var(--ink-soft)' }}>
                   <p className="mb-2">
@@ -227,6 +339,7 @@ export default async function AdminPage() {
               </th>
               <th scope="col">가입</th>
               <th scope="col">이번 주 씀</th>
+              <th scope="col">핵심</th>
               <th scope="col">2주 뒤에도 씀</th>
             </tr>
           </thead>
@@ -240,6 +353,7 @@ export default async function AdminPage() {
                   <b>{s.families}</b>
                 </td>
                 <td>{s.activeThisWeek || <span className="report-weeks__none">—</span>}</td>
+                <td>{s.core || <span className="report-weeks__none">—</span>}</td>
                 <td>
                   {s.retained14.eligible === 0 ? (
                     <span className="report-weeks__none">—</span>
@@ -300,4 +414,13 @@ export default async function AdminPage() {
       </p>
     </main>
   );
+}
+
+/** 한 집이 무료 한도의 어디에 닿았는지 짧게. 아무 데도 안 닿았으면 빈 문자열 */
+function limitText(h: LimitHits, perDay: number | null): string {
+  const parts: string[] = [];
+  if (h.sessionDays > 0) parts.push(`하루 ${(perDay ?? 0) + 1}회+ ${h.sessionDays}일`);
+  if (h.children) parts.push('아이 여럿');
+  if (h.photo) parts.push('사진 넣기');
+  return parts.join(' · ');
 }

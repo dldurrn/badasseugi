@@ -1,3 +1,4 @@
+import { LIMITS } from '@/lib/plan';
 import { seoulWeekStart, toDateKeyInSeoul } from '@/lib/review';
 
 /**
@@ -57,6 +58,52 @@ const FADING_AFTER = 14;
 const GONE_AFTER = 30;
 const NEW_WITHIN = 7;
 
+/**
+ * 핵심 사용자 — 「이탈하지 않음」(꾸준함)보다 높은 문턱. **돈을 낼 만큼 쓰는 집**을 가립니다.
+ * 주 2회꼴로 들어오고, 끝까지 마친 세션이 열 번은 되어야 합니다.
+ * 처음 정한 값이라 실제 분포를 보고 여기서 고칩니다.
+ */
+export const CORE_DAYS_28 = 8;
+export const CORE_SESSIONS_28 = 10;
+
+/**
+ * 「지금 무료 한도를 켰다면」 지난 28일에 막혔을 자리.
+ * **실제로 막는 것이 아닙니다**(`PLAN_ENABLED` 는 그대로) — 한도를 정하는 재료일 뿐입니다.
+ * 리포트 기간·AI 짝은 쓴 기록이 없어 대 볼 수 없습니다.
+ */
+export interface LimitHits {
+  /** 무료 하루 세션 수를 넘긴 날 수 */
+  sessionDays: number;
+  /** 무료 아이 수를 넘김 */
+  children: boolean;
+  /** 사진으로 문제를 넣음(무료는 못 씀) */
+  photo: boolean;
+}
+
+export function limitHits(input: {
+  children: number;
+  last28: Pick<AdminActivityRow, 'sessions' | 'ocr'>[];
+}): LimitHits {
+  const free = LIMITS.free;
+  return {
+    sessionDays:
+      free.sessionsPerDay === null
+        ? 0
+        : input.last28.filter((d) => d.sessions > free.sessionsPerDay!).length,
+    children: input.children > free.children,
+    photo: !free.photoInput && input.last28.some((d) => d.ocr > 0),
+  };
+}
+
+export function hitsAny(h: LimitHits): boolean {
+  return h.sessionDays > 0 || h.children || h.photo;
+}
+
+/** 막혔을 자리 수 — 「한도에 닿음」 정렬에 씁니다. 세션은 날 수만큼 무겁게 칩니다. */
+function hitWeight(h: LimitHits): number {
+  return h.sessionDays + (h.children ? 1 : 0) + (h.photo ? 1 : 0);
+}
+
 export interface FamilyUsage {
   row: AdminFamilyRow;
   status: UsageStatus;
@@ -65,6 +112,9 @@ export interface FamilyUsage {
   daysSinceActive: number | null;
   activeDays28: number;
   sessions28: number;
+  /** 핵심 사용자인가 (`CORE_DAYS_28`·`CORE_SESSIONS_28`) */
+  core: boolean;
+  limits: LimitHits;
   /** 주마다 쓴 날 수(0~7), 오래된 주부터 */
   weeks: number[];
   /** 최근 28일의 활동, 최근 것부터 */
@@ -83,6 +133,8 @@ export interface SourceStat {
   source: string | null;
   families: number;
   activeThisWeek: number;
+  /** 그중 핵심 사용자 */
+  core: number;
   retained14: { kept: number; eligible: number };
 }
 
@@ -95,6 +147,9 @@ export interface UsageSummary {
     activeLastWeek: number;
     /** 가입한 지 14일이 지난 집 중, 14일째 이후에도 쓴 집 */
     retained14: { kept: number; eligible: number };
+    core: number;
+    /** 무료 한도를 켰다면 막혔을 집 — 하나라도 / 갈래별 / 그중 핵심 사용자 */
+    wouldHit: { any: number; sessions: number; children: number; photo: number; core: number };
   };
   families: FamilyUsage[];
   cohorts: Cohort[];
@@ -169,6 +224,7 @@ export function buildUsage(
     const lastActive = row.last_active_on ? dayOf(row.last_active_on) : null;
     const last28 = days.filter((d) => d.day >= from28 && d.day <= today);
     const activeDays28 = last28.length;
+    const sessions28 = last28.reduce((sum, d) => sum + d.sessions, 0);
 
     const weeks = weekStarts.map(
       (start) => days.filter((d) => d.day >= start && d.day <= addDays(start, 6)).length,
@@ -180,18 +236,15 @@ export function buildUsage(
       status: statusOf({ today, signupDay, lastActive, activeDays28 }),
       daysSinceActive: lastActive ? diffDays(today, lastActive) : null,
       activeDays28,
-      sessions28: last28.reduce((sum, d) => sum + d.sessions, 0),
+      sessions28,
+      core: activeDays28 >= CORE_DAYS_28 && sessions28 >= CORE_SESSIONS_28,
+      limits: limitHits({ children: row.children_count, last28 }),
       weeks,
       recent: [...last28].sort((a, b) => (a.day < b.day ? 1 : -1)),
     };
   });
 
-  // 많이 쓰는 집이 위로. 같으면 최근에 쓴 집이 위.
-  usage.sort(
-    (a, b) =>
-      b.activeDays28 - a.activeDays28 ||
-      (a.daysSinceActive ?? Infinity) - (b.daysSinceActive ?? Infinity),
-  );
+  sortFamilies(usage, 'active');
 
   const activeIn = (from: string, to: string) =>
     new Set(activity.filter((a) => dayOf(a.day) >= from && dayOf(a.day) <= to).map((a) => a.family_id))
@@ -226,6 +279,7 @@ export function buildUsage(
       source,
       families: list.length,
       activeThisWeek: list.filter((f) => activeThisWeekIds.has(f.row.family_id)).length,
+      core: list.filter((f) => f.core).length,
       retained14: retained14(list),
     }))
     .sort((a, b) =>
@@ -254,6 +308,14 @@ export function buildUsage(
       activeThisWeek: activeThisWeekIds.size,
       activeLastWeek: activeIn(addDays(thisWeek, -7), addDays(thisWeek, -1)),
       retained14: retained14(usage),
+      core: usage.filter((f) => f.core).length,
+      wouldHit: {
+        any: usage.filter((f) => hitsAny(f.limits)).length,
+        sessions: usage.filter((f) => f.limits.sessionDays > 0).length,
+        children: usage.filter((f) => f.limits.children).length,
+        photo: usage.filter((f) => f.limits.photo).length,
+        core: usage.filter((f) => f.core && hitsAny(f.limits)).length,
+      },
     },
     families: usage,
     cohorts: cohorts.reverse(),
@@ -265,4 +327,63 @@ export function buildUsage(
 function seoulWeekStartOfKey(key: string): string {
   const dow = (new Date(toUtc(key)).getUTCDay() + 6) % 7; // 월=0
   return addDays(key, -dow);
+}
+
+// --- 정렬·거르기 -------------------------------------------------------------
+
+export type SortKey = 'active' | 'sessions' | 'recent' | 'signup' | 'limits';
+export const SORT_LABEL: Record<SortKey, string> = {
+  active: '많이 씀',
+  sessions: '세션 수',
+  recent: '최근 활동',
+  signup: '가입일',
+  limits: '한도에 닿음',
+};
+
+export type FilterKey = 'all' | 'core' | 'limits' | 'steady' | 'fading';
+export const FILTER_LABEL: Record<FilterKey, string> = {
+  all: '전체',
+  core: '핵심 사용자',
+  limits: '한도에 닿음',
+  steady: '꾸준함',
+  fading: '뜸해짐·떠남',
+};
+
+/** 주소의 값을 믿지 않습니다 — 모르는 값이면 기본으로. */
+export function parseSort(value: string | undefined): SortKey {
+  return value && Object.hasOwn(SORT_LABEL, value) ? (value as SortKey) : 'active';
+}
+export function parseFilter(value: string | undefined): FilterKey {
+  return value && Object.hasOwn(FILTER_LABEL, value) ? (value as FilterKey) : 'all';
+}
+
+/** 최근에 쓴 집이 앞. 한 번도 안 쓴 집은 맨 뒤 */
+const byRecent = (a: FamilyUsage, b: FamilyUsage) =>
+  (a.daysSinceActive ?? Infinity) - (b.daysSinceActive ?? Infinity);
+
+/** 제자리에서 정렬합니다. 같으면 언제나 최근에 쓴 집이 위. */
+export function sortFamilies(list: FamilyUsage[], key: SortKey): FamilyUsage[] {
+  const primary: Record<SortKey, (a: FamilyUsage, b: FamilyUsage) => number> = {
+    active: (a, b) => b.activeDays28 - a.activeDays28,
+    sessions: (a, b) => b.sessions28 - a.sessions28,
+    recent: () => 0,
+    signup: (a, b) => (a.row.signed_up_at < b.row.signed_up_at ? 1 : a.row.signed_up_at > b.row.signed_up_at ? -1 : 0),
+    limits: (a, b) => hitWeight(b.limits) - hitWeight(a.limits) || b.activeDays28 - a.activeDays28,
+  };
+  return list.sort((a, b) => primary[key](a, b) || byRecent(a, b));
+}
+
+export function filterFamilies(list: FamilyUsage[], key: FilterKey): FamilyUsage[] {
+  switch (key) {
+    case 'all':
+      return list;
+    case 'core':
+      return list.filter((f) => f.core);
+    case 'limits':
+      return list.filter((f) => hitsAny(f.limits));
+    case 'steady':
+      return list.filter((f) => f.status === 'steady');
+    case 'fading':
+      return list.filter((f) => f.status === 'fading' || f.status === 'gone');
+  }
 }
