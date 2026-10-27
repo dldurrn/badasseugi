@@ -656,34 +656,35 @@ const SFX = buildSfx();
 */
 const REELS = [
   /*
-    **8차 — 메뉴판 2탄, 투표형 3회차.** 1탄(곱빼기·찌개·떡볶이)이 이 계정에서 가장 잘 나온
-    소재(찌개 183·떡볶이 160)라 같은 결로 잇습니다. 정답 번호는 2·1·2 — 1편은 문제은행 순서 그대로,
-    3편은 `flip`으로 뒤집었습니다. 끝은 직접 만든 아웃트로(`channels/instagram/아웃트로/`).
+    **9차 — 투표형 4회차, 문장 속 표기.** 도대체·일부러·굳이는 어른이 글에서 가장 자주 틀리는 부사입니다.
+    정답 번호는 2·1·2 — 1편은 문제은행 순서 그대로, 2·3편에서 `flip`으로 번호를 섞었습니다.
+    (2편은 뒤집어서 1번, 3편은 원래 1번이라 뒤집어서 2번.)
   */
   {
-    file: '1_깍두기',
-    id: 'food-3',
+    file: '1_도대체',
+    id: 'dodaeche-1',
     format: 'dad',
     vote: true,
-    hook: ['깍두기 반찬 시킬 때', '제가 먼저 틀렸습니다'],
-    bonus: { wrong: '깍뚜기', right: '깍두기' },
+    hook: ['문자 보내다가', '손이 멈췄습니다'],
+    bonus: { wrong: '도데체', right: '도대체' },
   },
   {
-    file: '2_육개장',
-    id: 'food-4',
+    file: '2_일부러',
+    id: 'ilbureo-1',
     format: 'dad',
-    vote: true,
-    hook: ['점심 메뉴 고르다가', '제가 또 틀렸습니다'],
-    bonus: { wrong: '육계장', right: '육개장' },
-  },
-  {
-    file: '3_뚝배기',
-    id: 'food-6',
-    format: 'quiz',
     vote: true,
     flip: true,
-    hook: ['된장국 담는 그릇', '아이들이 자주 틀립니다'],
-    bonus: { wrong: '뚝빼기', right: '뚝배기' },
+    hook: ['변명할 때 꼭 쓰는 말', '쓸 때는 자주 틀립니다'],
+    bonus: { wrong: '일부로', right: '일부러' },
+  },
+  {
+    file: '3_굳이',
+    id: 'guji-1',
+    format: 'dad',
+    vote: true,
+    flip: true,
+    hook: ['안 해도 된다고 말할 때', '쓰다 보면 틀립니다'],
+    bonus: { wrong: '구지', right: '굳이' },
   },
 ];
 
