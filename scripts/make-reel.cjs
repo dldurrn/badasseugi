@@ -160,8 +160,8 @@ function voteLine(text, a = 1, y = 1022) {
   return fadeG(a, fit(text, y, 40, { font: SANS, weight: 700, color: GRID_DEEP }));
 }
 
-function frame(inner, reel) {
-  const tail = reel && fmt(reel).tail;
+function frame(inner, reel, { handle = true, showTail = true } = {}) {
+  const tail = showTail && reel && fmt(reel).tail;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
   <rect width="${W}" height="${H}" fill="${PAPER}"/>
   ${backdrop()}
@@ -173,8 +173,12 @@ function frame(inner, reel) {
              fill="${INK_SOFT}" text-anchor="middle">${esc(tail)}</text>`
       : ''
   }
-  <text x="${W / 2}" y="${HANDLE_Y}" font-family="${SANS}" font-size="34"
-        fill="${INK_FAINT}" text-anchor="middle">@badasseugi_note</text>
+  ${
+    handle
+      ? `<text x="${W / 2}" y="${HANDLE_Y}" font-family="${SANS}" font-size="34"
+        fill="${INK_FAINT}" text-anchor="middle">@badasseugi_note</text>`
+      : ''
+  }
 </svg>`;
 }
 
@@ -506,6 +510,56 @@ function sceneCta(q, reel, t) {
 }
 
 /*
+  유튜브 쇼츠용 아웃트로. 인스타 아웃트로와 다른 점:
+  · 「프로필 링크」가 없다 → **설명란 링크**로 안내하고 주소(badasseugi.com)를 화면에 적는다
+    (유튜브 영상 안의 글자는 눌러지지 않으므로 주소가 눈에 읽혀야 한다).
+  · 인스타 계정명(@badasseugi_note)과 꼬리표를 **그리지 않는다** — 유튜브 채널 이름이 다를 수 있다.
+  · 구독 한 줄을 둔다. 「무료」라는 말은 쓰지 않는다(영상에 박히면 못 고친다).
+  `--make-outro=youtube` 로 한 번 뽑아 channels/instagram/아웃트로/outro_youtube.mp4 에 둔다.
+*/
+const YT_OUTRO_DUR = 3.2;
+/*
+  채널별 아웃트로 문구. 뼈대(로고·소개·숫자)는 같고 **링크를 가리키는 말**만 다릅니다.
+  · youtube — 설명란 링크(+ 주소를 화면에 적음)
+  · naver   — 네이버 클립에는 프로필 링크가 없고 **콘텐츠 링크**(블로그 글 연결)가 있습니다.
+  파일: channels/instagram/아웃트로/outro_<이름>.mp4 / 영상 폴더: channels/<dir>/<차수>/
+*/
+const OUTRO_VARIANTS = {
+  youtube: {
+    sub: '구독하고 다음 맞춤법도 풀어보세요',
+    box1: '설명란 링크에서 바로 풀어보세요',
+    box2: 'badasseugi.com',
+    file: 'outro_youtube.mp4',
+    dir: 'youtube-shorts',
+    flag: '--no-youtube',
+  },
+  naver: {
+    sub: '다음 맞춤법도 함께 풀어보세요',
+    box1: '콘텐츠 링크에서 자세히 보세요',
+    box2: 'badasseugi.com',
+    file: 'outro_naver.mp4',
+    dir: 'naver-clip',
+    flag: '--no-naver',
+  },
+};
+function sceneCtaVariant(v, t) {
+  return frame(`
+  ${scaleAt(W / 2, 392, pop(t, 0, 0.35), cell(W / 2 - 92, 300, 184, '받'))}
+  ${rise(at(t, 0.2, 0.32), fit('받아쓰기 공책', 600, 72, { weight: 700, color: GRID_DEEP }))}
+  ${rise(at(t, 0.3, 0.32), fit('초등 1·2학년 받아쓰기 · 맞춤법', 678, 42, { font: SANS, color: INK_SOFT }))}
+  ${rise(at(t, 0.5, 0.32), fit(`받아쓰기 ${bankCounts().dictationLevels}단계 · 맞춤법 ${bankCounts().spelling}문제`, 850, 46, { font: SANS, color: INK }))}
+  ${rise(at(t, 0.6, 0.32), fit('원고지 채점 · 오답노트', 928, 46, { font: SANS, color: INK }))}
+  ${rise(at(t, 0.72, 0.32), fit(v.sub, 1030, 46, { font: SANS, weight: 700, color: GRID_DEEP }))}
+  ${rise(
+    at(t, 0.95, 0.4),
+    `<rect x="${PAD}" y="1120" width="${W - PAD * 2}" height="190" rx="28" fill="${GRID}"/>
+     ${fit(v.box1, 1204, 46, { font: SANS, weight: 700, color: '#ffffff' })}
+     ${fit(v.box2, 1268, 44, { font: SANS, weight: 700, color: '#ffffff' })}`,
+    30,
+  )}`, null, { handle: false, showTail: false });
+}
+
+/*
   장면과 길이. 훅을 1.5초에서 2.6초로 늘렸습니다 —
   두 줄을 읽고 문제까지 보기에 1.5초는 넘기라고 떠미는 시간이었습니다.
 */
@@ -535,6 +589,15 @@ const SAMPLE = ONLY.length > 0;
 const OUTRO_FILE = path.join(__dirname, '..', 'channels', 'instagram', '아웃트로', 'outro_badasseugi.mp4');
 const OUTRO =
   !SAMPLE && !process.argv.includes('--no-outro') && fs.existsSync(OUTRO_FILE) ? OUTRO_FILE : null;
+/*
+  채널별 아웃트로(OUTRO_VARIANTS)가 있으면 인스타 버전과 함께 channels/<dir>/<차수>/ 에도 뽑습니다.
+  (유튜브 쇼츠 --no-youtube / 네이버 클립 --no-naver 로 끔)
+*/
+const outroFile = (v) => path.join(__dirname, '..', 'channels', 'instagram', '아웃트로', v.file);
+const EXTRA_OUTROS = Object.entries(OUTRO_VARIANTS)
+  .filter(([, v]) => OUTRO && !process.argv.includes(v.flag) && fs.existsSync(outroFile(v)))
+  .map(([name, v]) => ({ name, dir: v.dir, file: outroFile(v) }));
+const MAKE_OUTRO = (process.argv.find((a) => a.startsWith('--make-outro=')) || '').slice(13);
 const SCENES = SAMPLE
   ? TIMELINE.filter((s) => ONLY.split(',').includes(s.name))
   : TIMELINE.filter((s) => !(OUTRO && s.name === 'cta'));
@@ -727,6 +790,37 @@ function printBank(bank) {
   const bank = loadBank();
   if (LIST) return printBank(bank);
 
+  if (MAKE_OUTRO) {
+    const VAR = OUTRO_VARIANTS[MAKE_OUTRO];
+    if (!VAR) throw new Error('--make-outro= 는 ' + Object.keys(OUTRO_VARIANTS).join(' / ') + ' 만 됩니다');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'outro-'));
+    try {
+      const total = Math.round(YT_OUTRO_DUR * FPS);
+      for (let i = 0; i < total; i++) {
+        const buf = await sharp(Buffer.from(sceneCtaVariant(VAR, i / FPS))).png({ compressionLevel: 1 }).toBuffer();
+        fs.writeFileSync(path.join(tmp, String(i).padStart(4, '0') + '.png'), buf);
+      }
+      const dest = outroFile(VAR);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      // 본편에 이어 붙일 때 소리 규격이 같도록 48k 스테레오 무음을 깝니다(인스타 아웃트로와 같은 규격).
+      execFileSync(
+        ffmpeg,
+        [
+          '-y', '-framerate', String(FPS), '-i', path.join(tmp, '%04d.png'),
+          '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo',
+          '-t', String(YT_OUTRO_DUR),
+          '-c:v', 'libx264', '-preset', 'slow', '-crf', '12', '-pix_fmt', 'yuv420p', '-r', String(FPS),
+          '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', dest,
+        ],
+        { stdio: 'pipe' },
+      );
+      console.log(MAKE_OUTRO + ' 아웃트로 →', path.relative(path.join(__dirname, '..'), dest), `(${YT_OUTRO_DUR}초)`);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+    return;
+  }
+
   const OUT_NAME = (process.argv.find((a) => a.startsWith('--out=')) || '').slice(6) || '_작업중';
   const outDir = path.join(__dirname, '..', 'channels', 'instagram', '릴스', OUT_NAME);
   fs.mkdirSync(outDir, { recursive: true });
@@ -762,6 +856,11 @@ function printBank(bank) {
         const body = path.join(tmp, 'body.mp4');
         encode(tmp, body);
         appendOutro(body, OUTRO, out);
+        for (const ex of EXTRA_OUTROS) {
+          const exDir = path.join(__dirname, '..', 'channels', ex.dir, OUT_NAME);
+          fs.mkdirSync(exDir, { recursive: true });
+          appendOutro(body, ex.file, path.join(exDir, name + '.mp4'));
+        }
       } else {
         encode(tmp, out);
       }
