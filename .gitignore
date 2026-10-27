@@ -17,3 +17,6 @@ channels/**/*.png
 # 블로그 이미지(앱 캡처·표지)는 저장소에 두지 않습니다 — 원본 캡처에 아이 별명이 보일 수 있고,
 # 표지·꾸미기 이미지는 scripts/build-blog-posts.cjs · make-naver-assets.cjs 로 다시 그립니다.
 blog/**/*.png
+
+# 설계도는 내부 문서라 공개 저장소에 올리지 않습니다.
+받아쓰기공책_설계도.pdf
