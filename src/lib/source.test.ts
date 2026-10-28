@@ -5,6 +5,7 @@ import {
   readSourceCookie,
   sourceFromReferrer,
   sourceFromUserAgent,
+  sourceFromUtm,
   sourceLabel,
 } from './source';
 
@@ -57,6 +58,44 @@ describe('짐작하기', () => {
     // 카톡 안 브라우저는 referrer 를 지웁니다
     expect(detectSource({ param: null, referrer: null, userAgent: KAKAO_UA, ownHost: HOST })).toBe('kakao');
     expect(detectSource({ param: null, referrer: null, userAgent: null, ownHost: HOST })).toBeNull();
+  });
+});
+
+describe('utm 꼬리표', () => {
+  const utm = (source: string | null, medium: string | null = null, campaign: string | null = null) => ({
+    source,
+    medium,
+    campaign,
+  });
+
+  it('네이버 블로그 글 링크는 「블로그 · 글 이름」으로', () => {
+    expect(
+      sourceFromUtm(utm('naver', 'blog', 'dictation-practice-sentences-grade2')),
+    ).toBe('blog-dictation-practice-sentences-grade2');
+    expect(sourceLabel('blog-dictation-practice-sentences-grade2')).toBe(
+      '블로그 · dictation-practice-sentences-grade2',
+    );
+  });
+
+  it('흔한 다른 이름은 우리 이름으로 맞춥니다', () => {
+    expect(sourceFromUtm(utm('Instagram'))).toBe('insta');
+    expect(sourceFromUtm(utm('kakaotalk', null, 'class1'))).toBe('kakao-class1');
+    expect(sourceFromUtm(utm('tistory', 'blog'))).toBe('tistory');
+  });
+
+  it('길면 자르고, 갈래가 이상하면 출처만 남깁니다', () => {
+    const long = sourceFromUtm(utm('naver', 'blog', 'a'.repeat(60)));
+    expect(long).toBe(`blog-${'a'.repeat(35)}`);
+    expect(sourceFromUtm(utm('naver', 'blog', '받아쓰기'))).toBe('blog');
+    expect(sourceFromUtm(utm('네이버'))).toBeNull();
+    expect(sourceFromUtm(utm(null, 'blog', 'x'))).toBeNull();
+  });
+
+  it('from 이 있으면 from 이 이기고, utm 은 referrer 보다 앞섭니다', () => {
+    const base = { referrer: 'https://m.blog.naver.com/x/1', userAgent: null, ownHost: HOST };
+    expect(detectSource({ ...base, param: 'insta', utm: utm('naver', 'blog', 'p1') })).toBe('insta');
+    expect(detectSource({ ...base, param: null, utm: utm('naver', 'blog', 'p1') })).toBe('blog-p1');
+    expect(detectSource({ ...base, param: null, utm: utm(null) })).toBe('blog');
   });
 });
 

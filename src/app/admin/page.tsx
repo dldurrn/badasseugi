@@ -22,8 +22,15 @@ import {
 } from '@/lib/admin-usage';
 import { LIMITS } from '@/lib/plan';
 import { readActiveProfile } from '@/lib/profile-server';
+import { toDateKeyInSeoul } from '@/lib/review';
 import { sourceLabel } from '@/lib/source';
 import { createClient } from '@/lib/supabase/server';
+import { stepRate, sumTrial, type TrialRow } from '@/lib/trial';
+
+/** n일 전의 서울 날짜 키. 오늘을 하루로 셉니다(7이면 오늘 포함 이레). */
+function seoulDaysAgo(n: number): string {
+  return toDateKeyInSeoul(new Date(Date.now() - (n - 1) * 86_400_000));
+}
 
 export const metadata = {
   title: '운영 현황 · 받아쓰기 공책',
@@ -55,10 +62,12 @@ export default async function AdminPage({
   if (view !== 'parent') notFound();
 
   const supabase = await createClient();
-  const [admin, fams, acts] = await Promise.all([
+  const [admin, fams, acts, trial] = await Promise.all([
     supabase.rpc('is_admin'),
     supabase.rpc('admin_families'),
     supabase.rpc('admin_activity', { since: activitySince() }),
+    // 0014 를 안 돌렸으면 이것만 실패합니다. 나머지 통계는 그대로 보여 줍니다.
+    supabase.rpc('admin_trial_counts', { since: seoulDaysAgo(28) }),
   ]);
   if (admin.error || admin.data !== true) notFound();
 
@@ -82,6 +91,9 @@ export default async function AdminPage({
   const { totals } = usage;
   const shown = filterFamilies(sortFamilies([...usage.families], sort), filter);
   const free = LIMITS.free;
+  const trialRows = trial.error ? null : ((trial.data ?? []) as TrialRow[]);
+  const trialWeek = trialRows ? sumTrial(trialRows, seoulDaysAgo(7)) : null;
+  const trialMonth = trialRows ? sumTrial(trialRows, seoulDaysAgo(28)) : null;
 
   /** 정렬과 거르기는 서로를 지우지 않습니다 — 하나를 바꿔도 다른 하나는 남습니다. */
   const hrefFor = (next: { sort?: SortKey; filter?: FilterKey }) => {
@@ -329,6 +341,59 @@ export default async function AdminPage({
         출처마다 「얼마나 오나」와 「와서 남나」를 나란히 둡니다.
         많이 데려오는 곳과 오래 쓸 집을 데려오는 곳이 다를 수 있어서입니다.
       */}
+      {/*
+        로그인 전 체험(`/try`). 「써 봤다 → 끝까지 했다 → 가입하러 눌렀다」 어디서 새는지 봅니다.
+        실제 가입 수는 위의 「가입한 집」과 아래 출처 표에 있습니다 — 여기 「가입 버튼」은 누른 횟수입니다.
+      */}
+      <h2 className="section-title mb-2">한 문장 써 보기 (로그인 전)</h2>
+      {trialWeek && trialMonth ? (
+        <div className="surface mb-2 overflow-x-auto">
+          <table className="report-weeks">
+            <thead>
+              <tr>
+                <th scope="col" className="report-weeks__name">
+                  기간
+                </th>
+                <th scope="col">써 보기</th>
+                <th scope="col">채점까지</th>
+                <th scope="col">가입 버튼</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { label: '최근 7일', t: trialWeek },
+                { label: '최근 28일', t: trialMonth },
+              ].map(({ label, t }) => (
+                <tr key={label}>
+                  <th scope="row" className="report-weeks__name">
+                    {label}
+                  </th>
+                  <td>
+                    <b>{t.start}</b>
+                  </td>
+                  <td>
+                    <b>{t.finish}</b>
+                    <span className="report-weeks__n">{stepRate(t.finish, t.start)}</span>
+                  </td>
+                  <td>
+                    <b>{t.cta}</b>
+                    <span className="report-weeks__n">{stepRate(t.cta, t.finish)}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="surface mb-2 p-4 text-sm" style={{ color: 'var(--ink-soft)' }}>
+          체험 횟수를 불러오지 못했어요. 마이그레이션 0014 를 돌렸는지 확인해 주세요.
+        </p>
+      )}
+      <p className="mb-6 px-1 text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
+        횟수만 세요 — 누가 했는지, 무엇을 썼는지는 남기지 않아요. 옆의 %는 바로 앞 단계 대비예요.
+        한 번 들어와서 여러 문장을 해도 「써 보기」는 한 번이에요.
+      </p>
+
       <h2 className="section-title mb-2">어디서 왔나</h2>
       <div className="surface mb-2 overflow-x-auto">
         <table className="report-weeks">

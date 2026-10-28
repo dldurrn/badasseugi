@@ -25,6 +25,42 @@ export function normalizeSource(raw: string | null | undefined): string | null {
   return SOURCE_PATTERN.test(value) ? value : null;
 }
 
+/** utm_source 에 흔히 쓰는 다른 이름. 같은 곳을 두 갈래로 세지 않게 우리 이름으로 맞춥니다. */
+const UTM_ALIAS: Record<string, string> = {
+  instagram: 'insta',
+  ig: 'insta',
+  kakaotalk: 'kakao',
+  kakaostory: 'kakao',
+};
+
+/**
+ * `utm_source`·`utm_medium`·`utm_campaign` 을 꼬리표 하나로 바꿉니다.
+ *
+ * 블로그에 utm 으로 링크를 걸어 둔 글이 이미 있어서, `?from=` 만 읽으면
+ * 그 글들에서 온 집이 referrer 짐작으로만 잡힙니다 — 네이버 앱 안에서 열면 그마저 「네이버」로 뭉개집니다.
+ *
+ * 갈래(`utm_campaign`)도 붙입니다. 어느 글이 데려왔는지가 이 꼬리표를 다는 이유입니다.
+ * 네이버 + 블로그는 `blog` 로 둡니다 — referrer 로 짐작한 것과 같은 줄에 모여야 합니다.
+ */
+export function sourceFromUtm(utm: {
+  source: string | null;
+  medium: string | null;
+  campaign: string | null;
+}): string | null {
+  const raw = utm.source?.trim().toLowerCase();
+  if (!raw) return null;
+  let head = UTM_ALIAS[raw] ?? raw;
+  if (head === 'naver' && utm.medium?.trim().toLowerCase() === 'blog') head = 'blog';
+  const base = normalizeSource(head);
+  if (!base) return null;
+
+  const campaign = utm.campaign?.trim().toLowerCase();
+  if (!campaign) return base;
+  // 길면 자릅니다. 갈래 이름이 잘려도 출처가 통째로 버려지는 것보다 낫습니다.
+  const joined = `${base}-${campaign}`.slice(0, 40).replace(/-+$/, '');
+  return normalizeSource(joined) ?? base;
+}
+
 /** referrer 주소로 짐작합니다. 우리 사이트 안에서 옮겨 다닌 것은 출처가 아닙니다. */
 export function sourceFromReferrer(referrer: string | null | undefined, ownHost: string): string | null {
   if (!referrer) return null;
@@ -39,6 +75,7 @@ export function sourceFromReferrer(referrer: string | null | undefined, ownHost:
   if (host.includes('instagram.com')) return 'insta';
   if (host === 'blog.naver.com' || host === 'm.blog.naver.com') return 'blog';
   if (host.includes('naver.com')) return 'naver';
+  if (host.includes('tistory.com')) return 'tistory';
   if (host.includes('kakao')) return 'kakao';
   if (host.includes('google.')) return 'google';
   if (host.includes('daum.net')) return 'daum';
@@ -59,12 +96,15 @@ export function sourceFromUserAgent(ua: string | null | undefined): string | nul
 
 export function detectSource(input: {
   param: string | null;
+  /** 없으면 utm 은 안 봅니다 */
+  utm?: { source: string | null; medium: string | null; campaign: string | null };
   referrer: string | null;
   userAgent: string | null;
   ownHost: string;
 }): string | null {
   return (
     normalizeSource(input.param) ??
+    (input.utm ? sourceFromUtm(input.utm) : null) ??
     sourceFromReferrer(input.referrer, input.ownHost) ??
     sourceFromUserAgent(input.userAgent)
   );
@@ -82,6 +122,7 @@ export function readSourceCookie(cookieHeader: string): string | null {
 const SOURCE_LABEL: Record<string, string> = {
   insta: '인스타',
   blog: '블로그',
+  tistory: '티스토리',
   kakao: '카톡',
   naver: '네이버',
   google: '구글',

@@ -7,6 +7,7 @@ import {
   SpeechController,
   STYLE_LABEL,
   type ReadingStyle,
+  type SpeechProvider,
   type SpeechRate,
 } from '@/lib/tts';
 import { sfx } from '@/lib/sfx';
@@ -69,6 +70,8 @@ export function DictationSession({
   onComplete,
   onExit,
   settings,
+  speechProvider,
+  trial = false,
 }: {
   items: SessionItem[];
   mode: Mode;
@@ -80,6 +83,17 @@ export function DictationSession({
   onExit: () => void;
   /** 서버가 읽어 내려준 값 — 이 아이 것 → 부모 기본값 → 앱 기본값 */
   settings: Settings;
+  /**
+   * 소리를 어디서 낼지. 없으면 서버 음성(`appSpeech`)입니다.
+   * 로그인 전 체험은 `/api/tts` 를 못 부르므로 미리 만든 파일을 틉니다(`demo-speech.ts`).
+   */
+  speechProvider?: SpeechProvider;
+  /**
+   * 로그인 전 체험(`/try`). **아무것도 저장하지 않는 자리**라
+   * 나가기 확인 창을 안 띄우고(절대 원칙 2는 기록에 대한 규칙), 속도 버튼도 그리지 않습니다 —
+   * 속도는 저장할 아이가 없고, 미리 만든 소리는 보통 속도 하나뿐입니다.
+   */
+  trial?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<Phase>('writing');
@@ -95,7 +109,10 @@ export function DictationSession({
   const inputRef = useRef<HTMLInputElement>(null);
   // 서버 음성을 먼저 쓰고 안 되면 브라우저 음성으로 넘어갑니다.
   // 서버가 어느 회사를 쓰는지는 여기서 알 필요가 없습니다(lib/tts-engines.ts).
-  const speech = useMemo(() => new SpeechController(appSpeech), []);
+  const speech = useMemo(
+    () => new SpeechController(speechProvider ?? appSpeech),
+    [speechProvider],
+  );
   const completedRef = useRef(false);
 
   const current = items[index];
@@ -103,7 +120,7 @@ export function DictationSession({
 
   // 한 글자라도 쓰기 시작했으면 그때부터 나가기를 붙잡습니다.
   const started = outcomes.length > 0 || typed.trim().length > 0;
-  useLeaveGuard(started && !completedRef.current, LEAVE_MESSAGE);
+  useLeaveGuard(!trial && started && !completedRef.current, LEAVE_MESSAGE);
 
   // 소리를 만드는 자리는 화면에서 머니 목소리를 한 번 꽂아 둡니다.
   useEffect(() => setActiveVoice(settings.voice), [settings.voice]);
@@ -143,7 +160,7 @@ export function DictationSession({
 
   /** 나가기 — 진행 중이면 기록이 저장되지 않음을 알립니다. */
   const handleExit = () => {
-    if (started && !window.confirm(LEAVE_MESSAGE)) return;
+    if (!trial && started && !window.confirm(LEAVE_MESSAGE)) return;
     speech.stop();
     onExit();
   };
@@ -241,11 +258,11 @@ export function DictationSession({
           <span
             className="rounded px-2 py-1 text-[11px] font-bold"
             style={{
-              background: mode === 'exam' ? 'var(--pen-tint)' : 'var(--grid-tint)',
-              color: mode === 'exam' ? 'var(--pen-deep)' : 'var(--grid-deep)',
+              background: mode === 'exam' && !trial ? 'var(--pen-tint)' : 'var(--grid-tint)',
+              color: mode === 'exam' && !trial ? 'var(--pen-deep)' : 'var(--grid-deep)',
             }}
           >
-            {mode === 'exam' ? '시험' : '연습'}
+            {trial ? '체험' : mode === 'exam' ? '시험' : '연습'}
           </span>
         </div>
 
@@ -302,6 +319,7 @@ export function DictationSession({
           ))}
         </div>
 
+        {!trial && (
         <div className="flex gap-1.5" role="group" aria-label="읽기 속도">
           {RATES.map((r) => (
             <button
@@ -328,6 +346,7 @@ export function DictationSession({
             </button>
           ))}
         </div>
+        )}
 
         <p className="text-center text-[11.5px]" style={{ color: 'var(--ink-faint)' }}>
           띄어쓰기가 헷갈리면 또박또박 듣기를 눌러 보세요

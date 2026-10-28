@@ -39,8 +39,15 @@ const CALLBACK_ERRORS: Record<string, string> = {
   missing: '주소가 올바르지 않아요. 처음부터 다시 로그인해 주세요.',
 };
 
-export function LoginForm({ callbackError }: { callbackError?: string }) {
-  const [mode, setMode] = useState<Mode>('signin');
+export function LoginForm({
+  callbackError,
+  startWithSignup = false,
+}: {
+  callbackError?: string;
+  /** 체험(`/try`)에서 「가입하고 시작하기」로 왔으면 가입 칸부터. 또 한 번 「가입」을 찾아 누르게 하지 않습니다 */
+  startWithSignup?: boolean;
+}) {
+  const [mode, setMode] = useState<Mode>(startWithSignup ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');

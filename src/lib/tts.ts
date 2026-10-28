@@ -144,7 +144,8 @@ export const STYLE_LABEL: Record<ReadingStyle, string> = {
   teacher: '선생님처럼 듣기',
 };
 
-const GAP_BETWEEN_WORDS = 520; // ms — 띄어쓰기를 귀로 알아챌 만한 간격
+/** ms — 띄어쓰기를 귀로 알아챌 만한 간격. 체험용 소리(`demo.ts`)도 이 값으로 만듭니다 */
+export const GAP_BETWEEN_WORDS = 520;
 const GAP_BETWEEN_PASSES = 850;
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {

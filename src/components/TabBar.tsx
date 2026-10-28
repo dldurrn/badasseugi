@@ -19,7 +19,7 @@ const TABS = [
 ] as const;
 
 /** 로그인·프로필 선택처럼 아직 '누가 쓰는지' 정해지지 않은 화면에서는 탭바를 감춥니다. */
-const HIDDEN_ON = ['/login', '/auth', '/onboarding', '/children'];
+const HIDDEN_ON = ['/login', '/auth', '/onboarding', '/children', '/try'];
 
 /**
  * 문제를 푸는 중에도 감춥니다.

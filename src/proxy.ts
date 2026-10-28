@@ -24,7 +24,7 @@ import { detectSource, SOURCE_COOKIE, SOURCE_COOKIE_MAX_AGE } from '@/lib/source
   약관이 여기 있는 것은 가입 화면에서 링크로 걸리기 때문입니다 —
   가입하기 전에 읽으라고 걸어 놓고, 누르면 로그인으로 돌려보내면 말이 안 됩니다.
 */
-const PUBLIC_PATHS = ['/login', '/auth', '/privacy', '/terms'];
+const PUBLIC_PATHS = ['/login', '/auth', '/privacy', '/terms', '/try'];
 
 /** 프로필을 고르기 전에도 열려 있어야 하는 화면 (선택 화면 자체와 그 안의 흐름) */
 const PROFILE_PATHS = ['/children'];
@@ -76,6 +76,11 @@ export async function proxy(request: NextRequest) {
       ? null
       : detectSource({
           param: request.nextUrl.searchParams.get('from'),
+          utm: {
+            source: request.nextUrl.searchParams.get('utm_source'),
+            medium: request.nextUrl.searchParams.get('utm_medium'),
+            campaign: request.nextUrl.searchParams.get('utm_campaign'),
+          },
           referrer: request.headers.get('referer'),
           userAgent: request.headers.get('user-agent'),
           ownHost: request.nextUrl.hostname,
@@ -99,6 +104,19 @@ export async function proxy(request: NextRequest) {
 
   if (!user) {
     if (isPublic) return done(response);
+    /*
+      처음 온 사람에게는 로그인 칸이 아니라 **한 문장 써 보기**를 보여 줍니다(`/try`).
+      뿌려 둔 링크가 거의 다 맨 주소라 여기서 갈라야 모든 링크가 한꺼번에 바뀝니다.
+
+      rewrite(주소는 `/` 그대로)가 아니라 redirect 입니다. 주소가 `/` 로 남으면
+      화면 쪽(`usePathname`)은 홈으로 알아 탭바를 그리는데, 로그인 안 한 사람에게 탭바는
+      누르면 전부 로그인으로 튕기는 버튼들입니다. 출처 쿠키는 이 응답에 얹으므로 그대로 셉니다.
+    */
+    if (pathname === '/') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/try';
+      return done(NextResponse.redirect(url));
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = '';
@@ -136,7 +154,11 @@ export const config = {
     확장자가 png·svg 가 아니라 아래 규칙에 안 걸리는데, 이게 로그인으로 막히면
     아직 로그인하지 않은 기기에서 「홈 화면에 추가」가 이름도 아이콘도 없이 붙습니다.
   */
+  /*
+    mp3 도 뺍니다 — 로그인 전 체험(`/try`)의 소리가 `public/demo-audio/` 에 있습니다.
+    여기 걸리면 그 파일이 로그인 화면으로 튕겨, 체험에서 「문장 듣기」가 기기 목소리로 떨어집니다.
+  */
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|webp|mp3)$).*)',
   ],
 };
