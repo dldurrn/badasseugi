@@ -315,8 +315,15 @@ export function GradeSheet({
   result,
   note,
   writeMode = 'wongoji',
+  example = false,
 }: {
   result: GradeResult;
+  /**
+   * 남이 쓴 것을 **보여 주는** 채점표(로그인 전 체험의 「아이들은 이렇게 틀려요」).
+   * 「다시 볼까요」 띠를 빼고 윗줄을 「아이가 쓴 것」으로 적습니다 —
+   * 그대로 두면 방금 맞힌 사람이 자기 채점 결과인 줄 압니다.
+   */
+  example?: boolean;
   /** 별 획득 안내 등 상황별 한 줄 안내 */
   note?: string | null;
   /**
@@ -358,15 +365,17 @@ export function GradeSheet({
       className="surface rise-in p-4"
       style={{ borderColor: 'var(--pen)', borderWidth: 2 }}
     >
-      <div
-        className="display mb-4 rounded py-3 text-center text-[22px] font-bold text-white"
-        style={{ background: 'var(--pen)' }}
-      >
-        다시 볼까요
-      </div>
+      {!example && (
+        <div
+          className="display mb-4 rounded py-3 text-center text-[22px] font-bold text-white"
+          style={{ background: 'var(--pen)' }}
+        >
+          다시 볼까요
+        </div>
+      )}
 
       <div className="mb-2.5 flex justify-center gap-4 text-[11.5px]">
-        <span style={{ color: 'var(--ink-soft)' }}>윗줄 · 내가 쓴 것</span>
+        <span style={{ color: 'var(--ink-soft)' }}>윗줄 · {example ? '아이가' : '내가'} 쓴 것</span>
         <span style={{ color: 'var(--grid)' }}>아랫줄 · 정답</span>
       </div>
 

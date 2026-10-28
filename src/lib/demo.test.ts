@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DEMO_GAP_MS, DEMO_MISTAKE, DEMO_SENTENCES, demoAudioPath } from './demo';
+import { DEMO_GAP_MS, DEMO_SENTENCES, demoAudioPath } from './demo';
 import { demoAudioFor } from './demo-speech';
 import { grade } from './grading';
 import { GAP_BETWEEN_WORDS } from './tts';
@@ -42,10 +42,16 @@ describe('로그인 전 체험', () => {
     expect(demoAudioFor('학교에 갔어요.', 'flow')).toBeNull();
   });
 
-  it('「아이들은 이렇게 틀려요」 예시는 모음·띄어쓰기·받침을 한 번에 짚습니다', () => {
-    const result = grade(DEMO_MISTAKE.answer, DEMO_MISTAKE.written);
-    expect(result.correct).toBe(false);
-    expect(result.errorTypes).toEqual(expect.arrayContaining(['vowel', 'spacing', 'batchim']));
-    expect(DEMO_SENTENCES.some((d) => d.sentence === DEMO_MISTAKE.answer)).toBe(true);
+  it('「아이들은 이렇게 틀려요」 예시는 문장마다 따로 있고, 띄어쓰기를 포함해 둘 이상을 짚습니다', () => {
+    for (const d of DEMO_SENTENCES) {
+      const result = grade(d.sentence, d.childWrites);
+      expect(result.correct, d.id).toBe(false);
+      expect(result.errorTypes, d.id).toContain('spacing');
+      expect(result.errorTypes.length, d.id).toBeGreaterThanOrEqual(2);
+    }
+    // 첫 문장은 문 여는 자리라 세 갈래를 한 번에 보여 줍니다
+    expect(grade(DEMO_SENTENCES[0].sentence, DEMO_SENTENCES[0].childWrites).errorTypes).toEqual(
+      expect.arrayContaining(['vowel', 'spacing', 'batchim']),
+    );
   });
 });

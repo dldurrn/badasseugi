@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { grade } from '@/lib/grading';
-import { DEMO_MISTAKE, DEMO_SENTENCES } from '@/lib/demo';
+import { DEMO_SENTENCES } from '@/lib/demo';
 import { demoSpeech } from '@/lib/demo-speech';
 import { DEFAULT_SETTINGS } from '@/lib/settings';
 import { countTrial } from '@/lib/trial';
@@ -40,10 +40,10 @@ export function TrialLanding() {
   const started = useRef(false);
   const finished = useRef(false);
 
-  // 그림이 아니라 실제 채점 엔진의 결과입니다. 엔진이 바뀌면 이것도 따라 바뀝니다.
-  const mistake = useMemo(() => grade(DEMO_MISTAKE.answer, DEMO_MISTAKE.written), []);
-
   const current = DEMO_SENTENCES[index];
+
+  // 방금 푼 문장을 아이가 틀리게 쓴 모양. 그림이 아니라 실제 채점 엔진의 결과입니다.
+  const mistake = useMemo(() => grade(current.sentence, current.childWrites), [current]);
   const hasMore = index < DEMO_SENTENCES.length - 1;
 
   const begin = () => {
@@ -104,24 +104,34 @@ export function TrialLanding() {
   if (stage === 'after') {
     return (
       <main className="page page--write" style={{ paddingBottom: 48 }}>
+        {/*
+          먼저 「내가 맞았나」에 답합니다. 그다음이 「아이들은 이렇게 틀린다」 —
+          순서가 뒤바뀌면 자기 결과를 찾느라 아래 채점표가 남의 것인지 내 것인지 헷갈립니다.
+        */}
         <header className="pb-4 pt-8">
-          <h1 className="display text-2xl font-bold">
-            {lastCorrect ? '다 맞게 쓰셨어요' : '틀린 곳을 한 글자씩 짚어 줬어요'}
+          <p className="text-sm" style={{ color: 'var(--ink-faint)' }}>
+            「{current.sentence}」
+          </p>
+          <h1
+            className="display mt-1 text-2xl font-bold"
+            style={{ color: lastCorrect ? 'var(--grid-deep)' : 'var(--pen-deep)' }}
+          >
+            {lastCorrect ? '맞았어요' : '틀린 곳이 있었어요'}
           </h1>
           <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
             {lastCorrect
-              ? '어른은 대개 다 맞혀요. 아이들은 같은 문장을 이렇게 써요 — 그럴 때 이렇게 짚어 줘요.'
-              : '아이도 똑같이 받아요. 틀린 문장은 오답노트에 모였다가, 두 번 잇달아 맞히면 졸업해요.'}
+              ? '어른은 대개 맞혀요. 그런데 아이들은 이 문장을 이렇게 많이 틀려요.'
+              : '방금처럼 틀린 곳을 한 글자씩 짚어 줘요. 아이들은 이 문장을 이렇게도 많이 틀려요.'}
           </p>
         </header>
 
-        {/* 어른은 거의 다 맞히므로 빨간 펜이 보이는 채점표를 하나 더 보여 줍니다 */}
+        {/* 방금 푼 그 문장으로 — 다른 문장이면 무엇을 견주라는 건지 알 수 없습니다 */}
         <section className="mb-6">
-          <h2 className="section-title mb-2">아이들은 이렇게 많이 틀려요</h2>
+          <h2 className="section-title mb-2">아이들은 이렇게 틀려요</h2>
           <p className="mb-3 text-[12.5px]" style={{ color: 'var(--ink-soft)' }}>
-            「{DEMO_MISTAKE.written}」라고 쓴 아이의 채점표예요. 모음, 띄어쓰기, 받침을 따로 짚어요.
+            「{current.childWrites}」라고 쓴 아이의 채점표예요. 틀린 갈래마다 따로 짚어 줘요.
           </p>
-          <GradeSheet result={mistake} writeMode="wongoji" />
+          <GradeSheet result={mistake} writeMode="wongoji" example />
         </section>
 
         <HowItWorks />
