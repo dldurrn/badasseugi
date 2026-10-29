@@ -431,6 +431,26 @@ const POSTS = [
       tags: ['받아쓰기시험전날', '받아쓰기준비', '받아쓰기공부법', '받아쓰기시험', '받아쓰기100점', '초등받아쓰기', '초등학습', '받아쓰기공책', '받아쓰기'],
     },
   },
+  {
+    // 네이버 AI 브리핑의 「띄어쓰기 연습 앱」을 겨냥한 글. 앱 이름을 늘어놓지 않고 종류로만 견줍니다 —
+    // 남의 앱 가격·기능은 자주 바뀌어 틀린 정보가 되기 쉽고, 이름을 다 적으면 남의 앱 소개 글이 됩니다.
+    src: '31-spacing-practice-app.html',
+    cover: { l1: '띄어쓰기 연습 앱', l2: '고르는 법', sub: '고르는 앱보다 직접 쓰는 앱', chars: ['띄', '어'] },
+    images: [
+      { file: 'D-write-typing', name: '01-write-on-wongoji', size: WIDE,
+        before: '<h2 data-ke-size="size26">한눈에 비교하면</h2>',
+        alt: '원고지 칸에 띄어쓰기 한 칸을 비우고 받아쓰기 문장을 쓰는 화면' },
+      { file: 'F-spacing-error', name: '02-spacing-grading', size: WIDE,
+        before: '<h2 data-ke-size="size26">자주 묻는 질문</h2>',
+        alt: '작은 발자국을 붙여 쓴 띄어쓰기 오류를 V 표식으로 짚어 주는 채점표' },
+    ],
+    naver: {
+      title: '띄어쓰기 연습 앱 | 초등 저학년은 고르는 앱보다 직접 쓰는 앱이 좋은 이유',
+      intro: '아이 띄어쓰기 연습 앱을 찾고 계신가요? 초등 저학년이라면 보기를 고르는 앱보다 소리를 듣고 직접 써 보는 앱이 받아쓰기 시험에 더 가까워요. 고를 때 볼 세 가지와, 앱 종류별 차이를 정리했어요.',
+      outro: '도움이 되셨다면 공감과 이웃 추가 부탁드려요. 원고지에 직접 써 보면 띄어쓰기를 어떻게 짚어 주는지 바로 알 수 있어요. 가입 없이 한 문장 써 보세요.',
+      tags: ['띄어쓰기연습앱', '띄어쓰기앱', '띄어쓰기연습', '초등띄어쓰기', '받아쓰기앱', '초등받아쓰기', '초등맞춤법', '초등학습앱', '받아쓰기연습', '받아쓰기공책'],
+    },
+  },
 ];
 
 /* ---------- 대표 이미지 ---------- */
@@ -537,6 +557,10 @@ function toNaverEditor(html, naverCfg) {
     const body = (t.match(/<tbody>([\s\S]*?)<\/tbody>/) || ['', ''])[1];
     let rows = [...body.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((m) => cells(m[1]));
     if (head[0] === '번호') rows = rows.map((r) => r.slice(1));
+    // 칸이 넷 이상인 비교표는 칸 이름을 붙여 씁니다 — 안 붙이면 「✕ — ✕ — ○」만 남아 무엇이 ✕ 인지 모릅니다
+    if (head[0] !== '번호' && head.length >= 4) {
+      return rows.map((r) => `<p>• <b>${r[0]}</b> — ${r.slice(1).map((c, i) => `${head[i + 1]} ${c}`).join(' · ')}</p>`).join('') + BL;
+    }
     return rows.map((r) => `<p>• ${r.join(' — ')}</p>`).join('') + BL;
   });
   h = h
@@ -580,6 +604,9 @@ function toPlain(html, naverCfg, items) {
     const body = (t.match(/<tbody>([\s\S]*?)<\/tbody>/) || ['', ''])[1];
     let rows = [...body.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((m) => cells(m[1]));
     if (head[0] === '번호') rows = rows.map((r) => r.slice(1)); // 번호 칸은 목록 기호가 대신합니다
+    if (head[0] !== '번호' && head.length >= 4) {
+      return '\n' + rows.map((r) => `- ${r[0]} — ${r.slice(1).map((c, i) => `${head[i + 1]} ${c}`).join(' · ')}`).join('\n') + '\n';
+    }
     return '\n' + rows.map((r) => '- ' + r.join(' — ')).join('\n') + '\n';
   });
   h = h
