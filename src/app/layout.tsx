@@ -37,8 +37,9 @@ export const metadata: Metadata = {
   },
   // 검색으로 오는 앱이 아니라 링크로 오는 앱이지만, 막을 이유도 없습니다.
   robots: { index: true, follow: true },
-  // 네이버 서치어드바이저 소유 확인. 지우면 사이트맵 제출·수집 요청이 끊깁니다.
+  // 구글 서치 콘솔·네이버 서치어드바이저 소유 확인. 지우면 사이트맵 제출·수집 요청이 끊깁니다.
   verification: {
+    google: 'S1b6krTt0a-67dIhvl7T7awQ3xVER_95dMo9yhHTxfE',
     other: { 'naver-site-verification': '5022706b1e421b99fe7b373ea432aa9b53ecb35b' },
   },
 };
