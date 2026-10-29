@@ -158,7 +158,11 @@ export const config = {
     mp3 도 뺍니다 — 로그인 전 체험(`/try`)의 소리가 `public/demo-audio/` 에 있습니다.
     여기 걸리면 그 파일이 로그인 화면으로 튕겨, 체험에서 「문장 듣기」가 기기 목소리로 떨어집니다.
   */
+  /*
+    robots.txt · sitemap.xml 도 뺍니다. 로그인으로 튕기면 검색 엔진이 사이트 지도를 못 읽어
+    `/try` 가 검색에 안 잡힙니다(실제로 한동안 그랬습니다).
+  */
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|webp|mp3)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|webp|mp3)$).*)',
   ],
 };
