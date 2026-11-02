@@ -535,6 +535,24 @@ function fillMarkers(html, items, naver) {
   2026-10-21 09번으로 붙여 확인했고(간격·소제목·목록 정상) 이게 네이버용 정식 파일입니다.
 */
 const BL = '<p><br></p>';
+
+/*
+  네이버는 글을 올려야 주소가 생겨서, 글 속의 「/entry/<슬러그>」 링크는 네이버에서 깨집니다.
+  올린 글의 주소를 `blog/naver-urls.json` 에 적어 두고(네이버-주소.md 참고), 아는 글은 그 주소로 잇고
+  아직 안 올린 글은 링크 없이 글자만 남깁니다 — 깨진 링크보다 글자가 낫습니다.
+*/
+const NAVER_URLS = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'blog', 'naver-urls.json'), 'utf8'));
+  } catch (e) {
+    return {};
+  }
+})();
+function naverLinks(h) {
+  return h.replace(/<a href="\/entry\/([^"]+)">([\s\S]*?)<\/a>/g, (_, slug, text) =>
+    NAVER_URLS[slug] ? `<a href="${NAVER_URLS[slug]}">${text}</a>` : text,
+  );
+}
 function toNaverEditor(html, naverCfg) {
   let h = html;
   h = h.replace(/<p data-ke-size="size16">[\s\S]*?<\/p>/, `<p data-ke-size="size16">${naverCfg.intro}</p>`);
@@ -543,7 +561,7 @@ function toNaverEditor(html, naverCfg) {
   if (!h.includes(rel)) throw new Error('함께 보면 좋은 글 제목을 못 찾았습니다');
   h = h.replace(rel, outro + rel);
   h = h.split('utm_source=tistory').join('utm_source=naver');
-  h = h.replace(/<li><a href="\/entry\/[^"]+">([\s\S]*?)<\/a><\/li>/g, '<li>$1</li>');
+  h = naverLinks(h);
 
   h = h.replace(/<div class="cta-box">([\s\S]*?)<\/div>/g, (_, inner) => {
     const strong = (inner.match(/<strong>([\s\S]*?)<\/strong>/) || ['', ''])[1];
@@ -586,7 +604,7 @@ function placeholderEditor(n, label, alt, size) {
 function toPlain(html, naverCfg, items) {
   let h = html;
   h = h.replace(/<p data-ke-size="size16">[\s\S]*?<\/p>/, '<p>' + naverCfg.intro + '</p>');
-  h = h.replace(/<li><a href="\/entry\/[^"]+">([\s\S]*?)<\/a><\/li>/g, '<li>$1</li>');
+  h = naverLinks(h);
   h = h.replace(/<!--IMG:(\d+)-->\n?/g, (_, d) => {
     const n = Number(d);
     return `\n[사진 ${n === 0 ? '대표' : n}: ${items[n].label} 를 여기에 올리기]\n`;
@@ -649,7 +667,7 @@ function guide({ meta, naver, items, folder }) {
 - 방법: \`naver-editor.html\`을 Chrome으로 열기 → Ctrl+A, Ctrl+C → 스마트에디터에서 Ctrl+V → 배경색이 칠해진 「▶ [이미지 …]」 줄 자리에 이미지를 올리고 그 줄은 지우기
 - 맨 위 이미지(대표)를 **대표 사진**으로 지정
 - 티스토리에 올린 뒤 **3일 이상 지나서** 올리세요 (같은 내용을 같은 날 올리면 중복 문서로 밀릴 수 있습니다)
-- 「함께 보면 좋은 글」은 네이버에 올린 다른 글 주소로 직접 연결하세요
+- 글끼리 링크는 \`blog/naver-urls.json\` 의 네이버 주소로 이미 걸려 있습니다(주소를 모르는 글은 글자만). 올린 뒤에는 \`channels/naver-blog/네이버-주소.md\` 와 json 에 이 글의 주소를 더하세요
 
 ## 이미지 (올릴 순서)
 | 번호 | 파일 | 위치 | 대체텍스트(설명) | 크기 |
