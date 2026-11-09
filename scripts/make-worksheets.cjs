@@ -7,37 +7,18 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const SHEETS = [
-  {
-    file: 'badasseugi-dictation-print-1.pdf',
-    qr: 'print-1.svg', // 가입 없이 써 보는 /try 로 가는 QR. 주소를 바꾸면 scripts/worksheet-qr/ 에서 다시 만드세요
-    title: '받아쓰기 프린트 1',
-    sub: '쉬운 문장 10개 · 받침이 적은 문장',
-    sentences: [
-      '나는 학교에 가요.',
-      '엄마가 밥을 해요.',
-      '토끼가 풀을 먹어요.',
-      '고양이가 놀고 있어요.',
-      '아기가 우유를 마셔요.',
-      '오늘은 날씨가 좋아요.',
-      '친구와 공원에서 놀아요.',
-      '할머니 댁에 갔어요.',
-      '비가 오면 우산을 써요.',
-      '동생이 그림을 그려요.',
-    ],
-  },
-];
+const SHEETS = require('./worksheets-data.cjs');
 
 const COLS = 15;
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
 function row(n, text, filled) {
-  const chars = [...text];
+  const chars = [...text.replace(/([,.]) /g, '$1')]; // 쉼표·마침표 뒤 공백은 원고지에서 한 칸을 차지하지 않습니다
   if (chars.length > COLS) throw new Error(`15칸 초과: ${text}`);
   let cells = '';
   for (let i = 0; i < COLS; i++) {
     const ch = chars[i] ?? '';
-    const punct = /[.,?!]/.test(ch);
+    const punct = /[.,]/.test(ch); // 마침표·쉼표만 칸 왼쪽 아래, ?·! 는 칸 가운데
     cells += `<i class="${punct ? 'p' : ''}">${filled ? esc(ch) : ''}</i>`;
   }
   return `<div class="row"><b>${n}</b><div class="g">${cells}</div></div>`;
@@ -54,7 +35,7 @@ function html(sheet) {
   const head = (label) => `
     <header><div><h1>${sheet.title}</h1><p>${sheet.sub}</p></div>
     <div class="who">${label}<span>이름 ____________ &nbsp; 날짜 ____월 ____일 &nbsp; 점수 ____ / 10</span></div></header>`;
-  const read = sheet.sentences.map((s, i) => `<li><span>${i + 1}</span>${esc(s)}</li>`).join('');
+  const read = sheet.sentences.map((s, i) => `<li><span>${i + 1}</span>${esc(s)}${sheet.notes ? `<em>${esc(sheet.notes[i])}</em>` : ''}</li>`).join('');
   return `<!doctype html><html lang="ko"><meta charset="utf-8"><style>
 @page{size:A4;margin:14mm 12mm}
 *{box-sizing:border-box}
@@ -76,6 +57,7 @@ header p{margin:2px 0 0;font-size:12px;color:#666}
 .tip{margin-top:6mm;font-size:12px;color:#555;line-height:1.7}
 ol{list-style:none;padding:0;margin:0;font-size:17px}
 li{padding:9px 0;border-bottom:1px dashed #bbb;font-family:'Batang','바탕',serif}
+li em{float:right;font-family:'Malgun Gothic',sans-serif;font-style:normal;font-size:11px;color:#888;margin-top:5px}
 li span{display:inline-block;width:9mm;font-family:'Malgun Gothic',sans-serif;font-size:13px;color:#2f6f4f;font-weight:bold}
 .box{border:1.5px solid #2f6f4f;border-radius:6px;padding:10px 14px;font-size:12.5px;line-height:1.8;margin-bottom:8mm}
 .qr{display:flex;align-items:center;gap:5mm;border:1.5px solid #2f6f4f;border-radius:6px;padding:4mm 5mm;margin-top:8mm;font-size:12.5px;line-height:1.7}
@@ -101,6 +83,7 @@ if (!chrome) throw new Error('Chrome/Edge 가 없습니다');
 const out = path.join(__dirname, '..', 'public', 'worksheets');
 fs.mkdirSync(out, { recursive: true });
 for (const s of SHEETS) {
+  if (process.env.WS_ONLY && String(s.no) !== process.env.WS_ONLY) continue;
   const tmp = path.join(os.tmpdir(), `ws-${Date.now()}.html`);
   fs.writeFileSync(tmp, html(s));
   if (process.env.WS_HTML) fs.copyFileSync(tmp, process.env.WS_HTML); // 미리보기용
