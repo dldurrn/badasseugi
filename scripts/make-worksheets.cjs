@@ -10,6 +10,7 @@ const { execFileSync } = require('child_process');
 const SHEETS = [
   {
     file: 'badasseugi-dictation-print-1.pdf',
+    qr: 'print-1.svg', // 가입 없이 써 보는 /try 로 가는 QR. 주소를 바꾸면 scripts/worksheet-qr/ 에서 다시 만드세요
     title: '받아쓰기 프린트 1',
     sub: '쉬운 문장 10개 · 받침이 적은 문장',
     sentences: [
@@ -42,6 +43,12 @@ function row(n, text, filled) {
   return `<div class="row"><b>${n}</b><div class="g">${cells}</div></div>`;
 }
 
+function qrBlock(sheet) {
+  if (!sheet.qr) return '';
+  const svg = fs.readFileSync(path.join(__dirname, 'worksheet-qr', sheet.qr), 'utf8');
+  return `<div class="qr"><div class="qrimg">${svg}</div><div><b>종이 말고 앱으로도 해 보세요</b><br>소리를 들려주고, 원고지에 쓰면 자동으로 채점해 줘요.<br>QR을 찍으면 가입 없이 한 문장을 써 볼 수 있어요.</div></div>`;
+}
+
 function html(sheet) {
   const rows = (filled) => sheet.sentences.map((s, i) => row(i + 1, s, filled)).join('');
   const head = (label) => `
@@ -71,6 +78,8 @@ ol{list-style:none;padding:0;margin:0;font-size:17px}
 li{padding:9px 0;border-bottom:1px dashed #bbb;font-family:'Batang','바탕',serif}
 li span{display:inline-block;width:9mm;font-family:'Malgun Gothic',sans-serif;font-size:13px;color:#2f6f4f;font-weight:bold}
 .box{border:1.5px solid #2f6f4f;border-radius:6px;padding:10px 14px;font-size:12.5px;line-height:1.8;margin-bottom:8mm}
+.qr{display:flex;align-items:center;gap:5mm;border:1.5px solid #2f6f4f;border-radius:6px;padding:4mm 5mm;margin-top:8mm;font-size:12.5px;line-height:1.7}
+.qrimg{width:26mm;height:26mm;flex:none}.qrimg svg{width:100%;height:100%;display:block}
 footer{margin-top:8mm;font-size:11px;color:#777;text-align:center}
 </style>
 <section>${head('문제지 · 들은 대로 칸에 써 보세요')}${rows(false)}
@@ -82,7 +91,7 @@ footer{margin-top:8mm;font-size:11px;color:#777;text-align:center}
 <section>${head('읽어 주는 분께 · 이 문장을 불러 주세요')}
 <div class="box"><b>이렇게 불러 주세요</b><br>① 문장을 처음부터 끝까지 한 번 천천히 읽어요. ② 두세 덩어리로 끊어서 다시 읽어요. ③ 마지막에 한 번 더 이어서 읽어요. 같은 문장은 아이가 요청할 때만 다시 읽어 주세요. 쓰는 동안 철자는 알려 주지 않아요.</div>
 <ol>${read}</ol>
-<footer>받아쓰기 공책 · badasseugi.com — 앱에서는 소리를 들려주고 자동으로 채점해 줘요</footer></section>
+${qrBlock(sheet)}<footer>받아쓰기 공책 · badasseugi.com</footer></section>
 </html>`;
 }
 
