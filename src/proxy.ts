@@ -163,6 +163,6 @@ export const config = {
     `/try` 가 검색에 안 잡힙니다(실제로 한동안 그랬습니다).
   */
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|webp|mp3)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|webp|mp3|pdf)$).*)',
   ],
 };

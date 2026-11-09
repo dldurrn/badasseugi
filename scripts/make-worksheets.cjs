@@ -1,0 +1,102 @@
+// 인쇄용 받아쓰기 PDF 만들기 — Chrome 헤드리스로 HTML 을 PDF 로 찍습니다.
+// 왜 Chrome 인가: 이 PC 에 파이썬이 없고, 한글 글꼴·CSS 격자를 가장 적은 코드로 그대로 얻을 수 있습니다.
+// 사용: node scripts/make-worksheets.cjs   → public/worksheets/*.pdf
+// 문장은 전부 새로 썼습니다. 한 줄 15칸(띄어쓰기도 한 칸)에 들어가야 합니다.
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { execFileSync } = require('child_process');
+
+const SHEETS = [
+  {
+    file: 'badasseugi-dictation-print-1.pdf',
+    title: '받아쓰기 프린트 1',
+    sub: '쉬운 문장 10개 · 받침이 적은 문장',
+    sentences: [
+      '나는 학교에 가요.',
+      '엄마가 밥을 해요.',
+      '토끼가 풀을 먹어요.',
+      '고양이가 놀고 있어요.',
+      '아기가 우유를 마셔요.',
+      '오늘은 날씨가 좋아요.',
+      '친구와 공원에서 놀아요.',
+      '할머니 댁에 갔어요.',
+      '비가 오면 우산을 써요.',
+      '동생이 그림을 그려요.',
+    ],
+  },
+];
+
+const COLS = 15;
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+
+function row(n, text, filled) {
+  const chars = [...text];
+  if (chars.length > COLS) throw new Error(`15칸 초과: ${text}`);
+  let cells = '';
+  for (let i = 0; i < COLS; i++) {
+    const ch = chars[i] ?? '';
+    const punct = /[.,?!]/.test(ch);
+    cells += `<i class="${punct ? 'p' : ''}">${filled ? esc(ch) : ''}</i>`;
+  }
+  return `<div class="row"><b>${n}</b><div class="g">${cells}</div></div>`;
+}
+
+function html(sheet) {
+  const rows = (filled) => sheet.sentences.map((s, i) => row(i + 1, s, filled)).join('');
+  const head = (label) => `
+    <header><div><h1>${sheet.title}</h1><p>${sheet.sub}</p></div>
+    <div class="who">${label}<span>이름 ____________ &nbsp; 날짜 ____월 ____일 &nbsp; 점수 ____ / 10</span></div></header>`;
+  const read = sheet.sentences.map((s, i) => `<li><span>${i + 1}</span>${esc(s)}</li>`).join('');
+  return `<!doctype html><html lang="ko"><meta charset="utf-8"><style>
+@page{size:A4;margin:14mm 12mm}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#222}
+section{page-break-after:always;min-height:268mm}
+section:last-child{page-break-after:auto}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #2f6f4f;padding-bottom:6px;margin-bottom:10mm}
+h1{margin:0;font-family:'Batang','바탕',serif;font-size:24px;color:#2f6f4f}
+header p{margin:2px 0 0;font-size:12px;color:#666}
+.who{text-align:right;font-size:12px}.who span{display:block;margin-top:4px}
+.who{font-weight:bold;color:#2f6f4f}.who span{font-weight:normal;color:#444}
+.row{display:flex;align-items:center;margin-bottom:5.2mm}
+.row b{width:8mm;font-size:13px;color:#2f6f4f}
+.g{display:flex;border-top:1.2px solid #2f6f4f;border-left:1.2px solid #2f6f4f}
+.g i{width:11.2mm;height:11.2mm;border-right:1.2px solid #2f6f4f;border-bottom:1.2px solid #2f6f4f;font-style:normal;
+ font-family:'Batang','바탕',serif;font-size:19px;display:flex;align-items:center;justify-content:center;color:#222}
+.g i.p{align-items:flex-end;padding-bottom:2px}
+.ans .g i{color:#c0392b}
+.tip{margin-top:6mm;font-size:12px;color:#555;line-height:1.7}
+ol{list-style:none;padding:0;margin:0;font-size:17px}
+li{padding:9px 0;border-bottom:1px dashed #bbb;font-family:'Batang','바탕',serif}
+li span{display:inline-block;width:9mm;font-family:'Malgun Gothic',sans-serif;font-size:13px;color:#2f6f4f;font-weight:bold}
+.box{border:1.5px solid #2f6f4f;border-radius:6px;padding:10px 14px;font-size:12.5px;line-height:1.8;margin-bottom:8mm}
+footer{margin-top:8mm;font-size:11px;color:#777;text-align:center}
+</style>
+<section>${head('문제지 · 들은 대로 칸에 써 보세요')}${rows(false)}
+<p class="tip">한 칸에 한 글자씩, 띄어쓰기는 한 칸을 비워요. 마침표(.)는 칸의 왼쪽 아래에 찍어요.</p>
+<footer>받아쓰기 공책 · badasseugi.com — 소리를 듣고, 칸에 쓰고, 틀린 곳을 바로 확인해요</footer></section>
+<section class="ans">${head('정답지 · 내가 쓴 것과 칸을 맞춰 비교해요')}${rows(true)}
+<p class="tip">틀린 곳은 빨간색으로 동그라미 하고, 틀린 문장은 다시 한 번 써 보세요. 이틀 뒤에 틀린 문장만 다시 풀면 기억이 오래 가요.</p>
+<footer>받아쓰기 공책 · badasseugi.com</footer></section>
+<section>${head('읽어 주는 분께 · 이 문장을 불러 주세요')}
+<div class="box"><b>이렇게 불러 주세요</b><br>① 문장을 처음부터 끝까지 한 번 천천히 읽어요. ② 두세 덩어리로 끊어서 다시 읽어요. ③ 마지막에 한 번 더 이어서 읽어요. 같은 문장은 아이가 요청할 때만 다시 읽어 주세요. 쓰는 동안 철자는 알려 주지 않아요.</div>
+<ol>${read}</ol>
+<footer>받아쓰기 공책 · badasseugi.com — 앱에서는 소리를 들려주고 자동으로 채점해 줘요</footer></section>
+</html>`;
+}
+
+const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe',
+  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
+if (!chrome) throw new Error('Chrome/Edge 가 없습니다');
+const out = path.join(__dirname, '..', 'public', 'worksheets');
+fs.mkdirSync(out, { recursive: true });
+for (const s of SHEETS) {
+  const tmp = path.join(os.tmpdir(), `ws-${Date.now()}.html`);
+  fs.writeFileSync(tmp, html(s));
+  if (process.env.WS_HTML) fs.copyFileSync(tmp, process.env.WS_HTML); // 미리보기용
+  execFileSync(chrome, ['--headless=new', '--disable-gpu', '--no-pdf-header-footer',
+    `--print-to-pdf=${path.join(out, s.file)}`, 'file:///' + tmp.split(path.sep).join('/')], { stdio: 'ignore' });
+  fs.unlinkSync(tmp);
+  console.log('만듦:', s.file);
+}
